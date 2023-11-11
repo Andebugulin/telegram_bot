@@ -28,7 +28,7 @@ import random
 logging.basicConfig(level=logging.INFO)
 
 # Initialize your Telegram Bot Token
-bot_token = "your bot token should be here, type string"
+bot_token = "your token"
 
 # Initialize the bot
 bot = Bot(token=bot_token)
@@ -260,7 +260,7 @@ class ToDoList:
         print()
         print(list(map(lambda x: x.name, self.tasks_template)))
         print()
-        self.sorting()
+        self.check(datetime.datetime.now())
 
     def check(self, date_time: datetime):
         for task in self.tasks:
@@ -296,6 +296,7 @@ class ToDoList:
         sorted_task_list = sorted(self.tasks_template, key=lambda x: (int(x.going), int(x.remaining_time), -len(x.name)), reverse=True)
         self.tasks_template = list(sorted_task_list)
         print('sorting', self.tasks == self.tasks_template)
+        
 
     def start_activity(self, task_name:str, date_time:datetime) -> bool:
         for index, task in enumerate(self.tasks):
@@ -330,6 +331,12 @@ class ToDoList:
             message += task.__str__() + '\n'
         message += '\n\n'
         return message
+
+    def len_tasks(self):
+        return len(self.tasks)
+
+    def len_tasks_template(self):
+        return len(self.tasks_template)
     
 
 
@@ -501,8 +508,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
         task_dictionary[chat_id] = ToDoList(chat_id) 
     await state.set_state(StepsForm.MENU)
 
-
-
     markup = custom_markup_for_start_restart_menu()
 
     await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
@@ -606,7 +611,7 @@ async def current_task_to_template(message: types.Message, state: FSMContext):
         markup = custom_markup_for_template()
 
         task_dictionary[chat_id].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks_template]
-        task_dictionary[chat_id].sorting()
+        task_dictionary[chat_id].check(datetime.datetime.now())
         await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 @dp.message(F.text.strip() == 'Replace template with current tasks')
@@ -620,7 +625,7 @@ async def template_to_current_task(message: types.Message, state: FSMContext):
         markup = custom_markup_for_template()
 
         task_dictionary[chat_id].tasks_template = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks]
-        task_dictionary[chat_id].sorting()
+        task_dictionary[chat_id].check(datetime.datetime.now())
         await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 
@@ -636,13 +641,13 @@ async def add_activity(message: types.Message, state: FSMContext):
             if task_dictionary[chat_id].start_activity(task_to_start_or_stop_from_user_splitted, date_time=message.date):
                 
                 markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-                task_dictionary[chat_id].sorting()
+                task_dictionary[chat_id].check(datetime.datetime.now())
 
                 await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully started or stopped \n' +  "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
 
                 markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-                task_dictionary[chat_id].sorting()
+                task_dictionary[chat_id].check(datetime.datetime.now())
 
                 await bot.send_message(chat_id, 'Task was not touched \n\n' +  "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
@@ -658,16 +663,17 @@ async def add_activity(message: types.Message, state: FSMContext):
         markup = custom_markup_for_add_activity()
         
         try:
+
             task_from_user_splitted = message.text.split()
             task_from_user = (' '.join(task_from_user_splitted[:-1]), task_from_user_splitted[-1])
             name_of_task, duration = task_from_user
             duration = int(duration)
-            if task_dictionary[chat_id].append(Task(name=name_of_task, duration=duration)):
-                task_dictionary[chat_id].sorting()
+            if (task_dictionary[chat_id].append(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks() <= 30):
+                task_dictionary[chat_id].check(datetime.datetime.now())
 
                 await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully added \n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Task with the same name exists\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         except Exception as e:
             print(e)
@@ -705,12 +711,12 @@ async def add_activity(message: types.Message, state: FSMContext):
             name_of_task, duration = task_from_user
             duration = int(duration)
             print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-            if task_dictionary[chat_id].append_to_template(Task(name=name_of_task, duration=duration)):
+            if (task_dictionary[chat_id].append_to_template(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks_template() <= 30):
                 print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-                task_dictionary[chat_id].sorting()
+                task_dictionary[chat_id].check(datetime.datetime.now())
                 await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully added \n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Task with the same name exists \n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         except Exception as e:
             print(e)
@@ -815,6 +821,33 @@ good_night_sentences = {
 }
 
 pickup_lines = {
+    "If you were a puzzle, you'd be the missing piece I've been searching for.",
+    "Are you a bookstore? Because every time I read you, I discover something new.",
+    "Is your name Espresso? Because you’re short, strong, and keep me up all night.",
+    "Do you have a name or can I call you mine? I promise I won't write it in my notebook... unless you want me to.",
+    "Are you a compass? Because I always find my direction when I'm with you.",
+    "If you were a song, you'd be the melody that never leaves my mind.",
+    "Are you a scientist? Because you just made my heart undergo a chemical reaction.",
+    "Do you have a sunburn, or are you always this electric?",
+    "Is your name Autumn? Because you've just fallen for me.",
+    "Are you a time traveler? Because I can see you in my future for a long time.",
+    "If you were a cookie, you'd be a 'fortune'-ate one.",
+    "Do you have a name, or can I call you mine? Because I'm claiming you as my happiness.",
+    "Are you a telescope? Because every time I look at you, my world expands.",
+    "If beauty were time, you'd be an everlasting moment.",
+    "Do you have a Band-Aid? Because I just hurt my knee falling... for you.",
+    "Is your name Atlas? Because you've shouldered your way into my heart.",
+    "Are you a garden? Because I'm digging you.",
+    "If you were a song, you'd be a symphony of perfection.",
+    "Do you have a sunburn, or are you always this fiery?",
+    "Is your name Cinderella? Because when you walked in, time stood still.",
+    "Are you a painter? Because you've colored my world with joy.",
+    "If you were a star, you'd be the constellation of my dreams.",
+    "Do you have a map? Because I just got lost in your eyes... again.",
+    "Is your name Winter? Because you make my heart feel ice-struck.",
+    "Are you a sculptor? Because you've crafted the masterpiece of my desires.",
+    "If you were a planet, you'd be the one I'd revolve around.",
+    "Do you have a name, or can I call you mine? Because I'm ready to start our story together.",
     "Are you a magician? Because whenever I look at you, everyone else disappears.",
     "Do you have a map? I keep getting lost in your eyes.",
     "If you were a vegetable, you'd be a cute-cumber!",
@@ -984,8 +1017,8 @@ async def action_over_time(current_time) -> None:
         for chat_ids in task_dictionary.keys():
             task_dictionary[chat_ids].check(date_time)
             await bot.send_message(chat_ids, f'''\n 
-                                                \U0001FA90 {random.choice(list(good_night_sentences))}\n
-                                                f"{random.choice(list(pickup_lines))}\n
+                                                \U0001FA90 {random.choice(list(good_night_sentences))}
+                                                \n{random.choice(list(pickup_lines))}\n
                                                     <strong>I Love You</strong> ''', 
                                     parse_mode='HTML', 
                                     disable_notification=True)   
@@ -1000,7 +1033,7 @@ async def action_over_time(current_time) -> None:
             task_dictionary[chat_ids].check(date_time)
             await bot.send_message(
                 chat_ids,
-                task_dictionary[chat_ids].__str__() + '\n\n\n\n' + f"{random.choice(list(pickup_lines))} <i>your progress</i> \n\n<code>Great job</code>",
+                task_dictionary[chat_ids].__str__() + '\n\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i>your progress</i> \n\n<code>Great job</code>",
                 parse_mode='HTML',
                 disable_notification=True
                                     )
@@ -1009,7 +1042,7 @@ async def action_over_time(current_time) -> None:
             task_dictionary[chat_ids].check(date_time)
             await bot.send_message(
                 chat_ids,
-                task_dictionary[chat_ids].__str__() + '\n\n\n' + f"{random.choice(list(pickup_lines))} <i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
+                task_dictionary[chat_ids].__str__() + '\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}      ---\n\n<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
                 parse_mode='HTML',
                 disable_notification=True
                                     )    
@@ -1017,7 +1050,7 @@ async def action_over_time(current_time) -> None:
         for chat_ids in task_dictionary.keys():
             task_dictionary[chat_ids].check(date_time)
             task_dictionary[chat_ids].tasks = task_dictionary[chat_ids].tasks_template
-            await bot.send_message(chat_ids, f"{random.choice(list(pickup_lines))} \n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_ids, f"      ---\n{random.choice(list(pickup_lines))}      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
@@ -1085,7 +1118,7 @@ async def main():
         FSMContext_file = 'fsm_context.json'
         task_dictionary = {}
         task_dictionary = initial_set_up(FILE_NAME)
-        await on_startup('your chat id, should be type int', task_dictionary) # my chat id
+        await on_startup(<your id here>, task_dictionary) # my chat id
 
         await dp.start_polling(bot)
     finally:
