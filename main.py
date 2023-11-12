@@ -1,7 +1,6 @@
 import telebot
 from telebot import types
 import datetime
-import os
 import logging
 import sqlite3
 import asyncio
@@ -19,7 +18,11 @@ import json
 import pytz
 import math
 import random
+from dotenv import load_dotenv
+import os
 
+
+load_dotenv()
 
 
 
@@ -28,7 +31,7 @@ import random
 logging.basicConfig(level=logging.INFO)
 
 # Initialize your Telegram Bot Token
-bot_token = "your token"
+bot_token = os.getenv("BOT_TOKEN")
 
 # Initialize the bot
 bot = Bot(token=bot_token)
@@ -89,22 +92,21 @@ class Task:
             hours, minutes = self.remaining_time // 60, self.remaining_time % 60
             if self.remaining_time > 599 and self.remaining_time % 60 < 10 and self.remaining_time % 60 > 0:
                 printing_remaining_time =  f'0{hours}:0{minutes} h:m'  
-            elif self.remaining_time > 120 and self.remaining_time % 60 != 0:
+            elif self.remaining_time > 120 and self.remaining_time % 60 < 10 and self.remaining_time % 60 >= 0:
+                printing_remaining_time =  f'0{hours}:0{minutes} h:m'
+            elif self.remaining_time > 120 and self.remaining_time % 60 >= 0:
                 printing_remaining_time =  f'0{hours}:{minutes} h:m'
-            elif self.remaining_time > 120 and self.remaining_time % 60 == 0:
-                printing_remaining_time =  f'{hours} min'
-            elif self.remaining_time > 60 and self.remaining_time % 60 < 10 and self.remaining_time % 60 > 0:
+            elif self.remaining_time > 60 and self.remaining_time % 60 < 10 and self.remaining_time % 60 >= 0:
                 printing_remaining_time =  f'0{hours}:0{minutes} h:m' 
-            elif self.remaining_time > 60 and self.remaining_time % 60 == 0:
+            elif self.remaining_time > 60 and self.remaining_time % 60 != 0:
                 printing_remaining_time =  f'0{hours}:{minutes} h:m'
             elif self.remaining_time == 60:
                 printing_remaining_time =  f'0{hours}:00 h:m'
-            elif self.remaining_time < 10:
+            elif self.remaining_time < 60 and self.remaining_time > 9:
                 printing_remaining_time =  f'{minutes} min'
-            elif self.remaining_time < 60:
-                printing_remaining_time =  f'{minutes} min'
-            elif self.remaining_time == 1:
-                printing_remaining_time =  f'{minutes} min'
+            elif self.remaning_time < 60 and self.remaining_time < 10:
+                printing_remaining_time =  f' {minutes} min'
+            
 
             if len(printing_remaining_time) > 11:
                 space3 = 0
@@ -125,11 +127,11 @@ class Task:
                 return f"~<i><code>{' ' * space1}{self.name}{' ' * space2}</code></i>  ~<i><code>{'<code> </code>' * space3}{printing_remaining_time}{'<code> </code>' * space4}</code></i>~"
         else:
             
-            if len('accomplished') > 20:
+            if len('*') > 20:
                 space3 = 0
                 space4 = 0
             else:
-                space3 = (20 - len('accomplished') ) / 2
+                space3 = (20 - len('*') ) / 2
                 if space3 % 1 == 0:
                     space3 = int(space3)
                     space4 = space3
@@ -137,7 +139,7 @@ class Task:
                     space3 = int(math.floor(space3))
                     space4 = space3 + 1 
 
-            return f" *<code>{' ' * space1}{self.name}{' ' * space2} </code> *<i>{' ' * 0}accomplished{' ' * 0}</i>*"
+            return f" * <code>{' ' * space1}{self.name}{' ' * space2}</code> *"
 
     def __dict__(self):
         return {
@@ -209,7 +211,16 @@ class ToDoList:
 
     def __str__(self):
         message = 'Working:\n\n'
+        accomplishments = False
+        going = False
         for task in self.tasks:
+            if not accomplishments and '*' in task.__str__():
+                message += '\n\n'
+                accomplishments = True
+            if not going and not task.going:
+                message += '\n'
+                going = True
+            
             message += task.__str__() + '\n'
         message += '\n\n'
 
@@ -1018,7 +1029,7 @@ async def action_over_time(current_time) -> None:
             task_dictionary[chat_ids].check(date_time)
             await bot.send_message(chat_ids, f'''\n 
                                                 \U0001FA90 {random.choice(list(good_night_sentences))}
-                                                \n{random.choice(list(pickup_lines))}\n
+                                                \n\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n
                                                     <strong>I Love You</strong> ''', 
                                     parse_mode='HTML', 
                                     disable_notification=True)   
@@ -1042,7 +1053,7 @@ async def action_over_time(current_time) -> None:
             task_dictionary[chat_ids].check(date_time)
             await bot.send_message(
                 chat_ids,
-                task_dictionary[chat_ids].__str__() + '\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}      ---\n\n<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
+                task_dictionary[chat_ids].__str__() + '\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
                 parse_mode='HTML',
                 disable_notification=True
                                     )    
@@ -1050,7 +1061,7 @@ async def action_over_time(current_time) -> None:
         for chat_ids in task_dictionary.keys():
             task_dictionary[chat_ids].check(date_time)
             task_dictionary[chat_ids].tasks = task_dictionary[chat_ids].tasks_template
-            await bot.send_message(chat_ids, f"      ---\n{random.choice(list(pickup_lines))}      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_ids, f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
@@ -1118,7 +1129,7 @@ async def main():
         FSMContext_file = 'fsm_context.json'
         task_dictionary = {}
         task_dictionary = initial_set_up(FILE_NAME)
-        await on_startup(<your id here>, task_dictionary) # my chat id
+        await on_startup(773603143, task_dictionary) # my chat id
 
         await dp.start_polling(bot)
     finally:
