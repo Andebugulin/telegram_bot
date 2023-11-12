@@ -104,7 +104,7 @@ class Task:
                 printing_remaining_time =  f'0{hours}:00 h:m'
             elif self.remaining_time < 60 and self.remaining_time > 9:
                 printing_remaining_time =  f'{minutes} min'
-            elif self.remaning_time < 60 and self.remaining_time < 10:
+            elif self.remaining_time < 60 and self.remaining_time < 10:
                 printing_remaining_time =  f' {minutes} min'
             
 
@@ -521,7 +521,7 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
     markup = custom_markup_for_start_restart_menu()
 
-    await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+    await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 @dp.message(F.text.strip() == 'Menu')
 async def menu_activity(message: types.Message, state: FSMContext): 
@@ -532,7 +532,7 @@ async def menu_activity(message: types.Message, state: FSMContext):
         
         markup = custom_markup_for_start_restart_menu()
 
-        await bot.send_message(chat_id, "What task do you want to start, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         # Save the FSMContext to a JSON file
         # save_fsm_context_to_json(state, FSMContext_file)
@@ -546,7 +546,7 @@ async def start_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Start/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 @dp.message(F.text.strip() == 'Template')
 async def start_activity(message: types.Message, state: FSMContext):  
@@ -557,7 +557,7 @@ async def start_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_template()
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
     
     # Save the FSMContext to a JSON file
@@ -572,7 +572,7 @@ async def add_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_add_activity()
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Add:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         # Save the FSMContext to a JSON file
         # save_fsm_context_to_json(state, FSMContext_file)
@@ -583,7 +583,7 @@ async def add_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_template_add_activity()
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Add:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         # Save the FSMContext to a JSON file
         # save_fsm_context_to_json(state, FSMContext_file)
@@ -598,7 +598,7 @@ async def delete_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
     if await state.get_state() == StepsForm.TEMPLATE: 
         chat_id = message.from_user.id
@@ -606,7 +606,7 @@ async def delete_activity(message: types.Message, state: FSMContext):
 
         markup = custom_markup_for_template_delete_activity(task_dictionary, chat_id)
 
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         # Save the FSMContext to a JSON file
         # save_fsm_context_to_json(state, FSMContext_file)
@@ -623,7 +623,7 @@ async def current_task_to_template(message: types.Message, state: FSMContext):
 
         task_dictionary[chat_id].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks_template]
         task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 @dp.message(F.text.strip() == 'Replace template with current tasks')
 async def template_to_current_task(message: types.Message, state: FSMContext):  
@@ -637,7 +637,7 @@ async def template_to_current_task(message: types.Message, state: FSMContext):
 
         task_dictionary[chat_id].tasks_template = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks]
         task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What task do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "What do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 
 @dp.message(F.text.strip() != 'Delete' and F.text.strip() != 'Start' and F.text.strip() != 'Add')
@@ -654,18 +654,18 @@ async def add_activity(message: types.Message, state: FSMContext):
                 markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
                 task_dictionary[chat_id].check(datetime.datetime.now())
 
-                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully started or stopped \n' +  "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully started or stopped \n' +  "Start/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
 
                 markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
                 task_dictionary[chat_id].check(datetime.datetime.now())
 
-                await bot.send_message(chat_id, 'Task was not touched \n\n' +  "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, 'Task was not touched \n\n' +  "Start/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         except Exception as e:
             print(e)
 
-            await bot.send_message(chat_id, 'Task was not touched \n' +  "What task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_id, 'Task was not touched \n' +  "Start/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
    
     elif await state.get_state() == StepsForm.ADD:
 
@@ -682,13 +682,13 @@ async def add_activity(message: types.Message, state: FSMContext):
             if (task_dictionary[chat_id].append(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks() <= 30):
                 task_dictionary[chat_id].check(datetime.datetime.now())
 
-                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully added \n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully added \n' +  "Add:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Add:\nTask with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         except Exception as e:
             print(e)
-            await bot.send_message(chat_id, "Task was not added\n\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_id, "Task was not added\n\nAdd:\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
        
     elif await state.get_state() == StepsForm.DELETE:
   
@@ -705,12 +705,12 @@ async def add_activity(message: types.Message, state: FSMContext):
                 print()
                 markup = custom_markup_for_start_and_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
 
-                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully deleted \n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully deleted \n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
         except Exception as e:
             print(e)
-            await bot.send_message(chat_id, 'Task was not deleted \n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_id, 'Task was not deleted \n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
     elif await state.get_state() == StepsForm.TEMPLATE_ADD:
         chat_id = message.from_user.id
 
@@ -725,13 +725,13 @@ async def add_activity(message: types.Message, state: FSMContext):
             if (task_dictionary[chat_id].append_to_template(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks_template() <= 30):
                 print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
                 task_dictionary[chat_id].check(datetime.datetime.now())
-                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully added \n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully added \n' +  "Add:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Add:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
         except Exception as e:
             print(e)
-            await bot.send_message(chat_id, "Task was not added\n\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_id, "Task was not added\n\nAdd:\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
     elif await state.get_state() == StepsForm.TEMPLATE_DELETE:
   
         chat_id = message.from_user.id
@@ -744,12 +744,12 @@ async def add_activity(message: types.Message, state: FSMContext):
             if task_dictionary[chat_id].delete_task_from_template(task_to_delete_from_user_splitted):
                 markup = custom_markup_for_template_delete_activity(task_dictionary, chat_id)
 
-                await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully deleted \n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully deleted \n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
             else:
-                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
         except Exception as e:
             print(e)
-            await bot.send_message(chat_id, 'Task was not deleted \n' +  "What task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            await bot.send_message(chat_id, 'Task was not deleted \n' +  "Delete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
     save_dict_to_json(data=task_dictionary, json_file=FILE_NAME)
 
@@ -1078,7 +1078,8 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
 
     # Schedule the message to be sent daily at 12:00
     asyncio.create_task(scheduled_messages(task_dictionary))
-    
+ 
+
 def initial_set_up(json_file:str) -> dict:
     try:
         new_data = {}
