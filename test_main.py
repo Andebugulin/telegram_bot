@@ -10,7 +10,7 @@ from aiogram.filters.command import Command
 from aiogram.types import CallbackQuery, Message
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from statesform import StepsForm
+from test_statesform import StepsForm
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 import json
 import pytz
@@ -1346,7 +1346,7 @@ async def main() -> None:
         FILE_NAME = 'data.json'
         FSMContext_file = 'fsm_context.json'
         task_dictionary = {}
-        task_dictionary = intial_set_up(FILE_NAME)
+        task_dictionary = initial_set_up(FILE_NAME)
         await on_startup(773603143, task_dictionary) # my chat id
 
         await dp.start_polling(bot)
