@@ -606,7 +606,7 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     task_dictionary[chat_id].check(datetime.datetime.now())
 
     markup = custom_markup_for_the_menu()
-
+    
     await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
 @dp.message(F.text.strip() == 'DEACTIVATE')
@@ -1215,53 +1215,80 @@ async def action_over_time(current_time) -> None:
     h, m = current_time.hour, current_time.minute
     if current_time.hour == 21 and current_time.minute == 59: # night message
         # Send the scheduled message
-        for chat_ids in task_dictionary.keys():
+        for chat_ids in list(task_dictionary.keys()):
             CONSOLE = f'''\n 
                         CONSOLE: sending user scheduled message <good night message>\n
                         CHAT_ID: {chat_ids}\n
                '''
             print(CONSOLE)
             task_dictionary[chat_ids].check(date_time)
-            await bot.send_message(chat_ids, f'''\n 
+            try:
+                await bot.send_message(chat_ids, f'''\n 
                                                 \U0001FA90 {random.choice(list(good_night_sentences))}
                                                 \n\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n
                                                     <strong>I Love You</strong> ''', 
                                     parse_mode='HTML', 
-                                    disable_notification=True)   
+                                    disable_notification=True)  
+            except Exception as e:
+                if 'forbidden: bot was blocked' in str(e).lower():
+                    del task_dictionary[chat_ids]
+                    CONSOLE = f'''\n\n\n
+                                CHAT_ID blocked us,\n
+                                we delete him {chat_ids}\n\n\n''' 
+                    print(CONSOLE)
+                                       
 
     if (current_time.hour != 1 and current_time.minute == 0) and \
          (current_time.hour != 2 and current_time.minute == 0) and \
          (current_time.hour != 3 and current_time.minute == 0) and \
          (current_time.hour != 22 and current_time.minute == 0):
-        for chat_ids in task_dictionary.keys():
+        for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
                         CONSOLE: sending user scheduled message <success, so far>\n
                         CHAT_ID: {chat_ids}\n
                '''
             print(CONSOLE)
-            await bot.send_message(
+            try:
+                await bot.send_message(
                 chat_ids,
                 task_dictionary[chat_ids].__str__() + '\n\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i>your progress</i> \n\n<code>Great job</code>",
                 parse_mode='HTML',
                 disable_notification=True
-                                    )
+                                    ) 
+            except Exception as e:
+                if 'forbidden: bot was blocked' in str(e).lower():
+                    del task_dictionary[chat_ids]
+                    CONSOLE = f'''\n\n\n
+                                CHAT_ID blocked us,\n
+                                we delete him {chat_ids}\n\n\n''' 
+                    print(CONSOLE)
+            
     if (current_time.hour == 22 and current_time.minute == 0):
-        for chat_ids in task_dictionary.keys():
+        for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
                         CONSOLE: sending user scheduled message <success for today>\n
                         CHAT_ID: {chat_ids}\n
                '''
             print(CONSOLE)
-            await bot.send_message(
+            try:
+                await bot.send_message(
                 chat_ids,
                 task_dictionary[chat_ids].__str__() + '\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
                 parse_mode='HTML',
                 disable_notification=True
-                                    )    
+                                    )   
+            except Exception as e:
+                if 'forbidden: bot was blocked' in str(e).lower():
+                    del task_dictionary[chat_ids]
+                    CONSOLE = f'''\n\n\n
+                                CHAT_ID blocked us,\n
+                                we delete him {chat_ids}\n\n\n''' 
+                    print(CONSOLE)
+               
     if (current_time.hour == 1 and current_time.minute == 0): # 03:00
-        for chat_ids in task_dictionary.keys():
+        for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
                         CONSOLE: sending user scheduled message <reset today's tasks>\n
@@ -1269,7 +1296,18 @@ async def action_over_time(current_time) -> None:
                '''
             print(CONSOLE)
             task_dictionary[chat_ids].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_ids].tasks_template]
-            await bot.send_message(chat_ids, f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
+            
+            try:
+                await bot.send_message(chat_ids, f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
+            except Exception as e:
+                if 'forbidden: bot was blocked' in str(e).lower():
+                    del task_dictionary[chat_ids]
+                    CONSOLE = f'''\n\n\n
+                                CHAT_ID blocked us,\n
+                                we delete him {chat_ids}\n\n\n''' 
+                    print(CONSOLE)
+            
+            
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
