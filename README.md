@@ -142,5 +142,5 @@ To get started with the bot, it's recommended to set up a virtual environment to
 
 ## License
 
-This project is licensed under the [MIT License] - see the [LICENSE.md](LICENSE.md) file for details.
+This project is licensed under the [MIT License] - see the [LICENSE.md](LICENSE) file for details.
 
