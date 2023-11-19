@@ -142,12 +142,5 @@ To get started with the bot, it's recommended to set up a virtual environment to
 
 ## License
 
-Specify the license under which your Telegram bot is released.
+This project is licensed under the [MIT License] - see the [LICENSE.md](LICENSE.md) file for details.
 
-This project is licensed under the [License Name] - see the [LICENSE.md](LICENSE.md) file for details.
-
----
-
-Replace the placeholders (`your-telegram-bot`, `Feature 1`, `yourusername`, etc.) with your actual bot name, features, usernames, and relevant information.
-
-Remember to include specific details that can guide users on how to install, use, and contribute to your Telegram bot effectively.
