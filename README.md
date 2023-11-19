@@ -87,12 +87,17 @@ To get started with the bot, it's recommended to set up a virtual environment to
 
 ## Usage
 
+#### Tasks view:
+![tasks image](images/tasks.jpg)
+
 #### Interface Overview:
+ ![Menu image, menu contains Working button and Template button](images/menu.jpg)
 - **Simple Interface**: The bot provides a straightforward interface with two main buttons:
   - **"Working" Button**: Accesses tasks scheduled for the day.
   - **"Template" Button**: Manages and modifies template tasks.
 
 #### Working with "Working" Button:
+![Working image, working contains start/stop button, add and delete buttons](images/working.jpg)
 - **View Tasks for Today**: Clicking the "Working" button displays tasks scheduled for the day.
 - **Add and Delete Tasks**:
   - **Add Tasks**: Users can add tasks and specify the task's name and duration in minutes.
@@ -102,6 +107,7 @@ To get started with the bot, it's recommended to set up a virtual environment to
   - Users can start or stop tasks that are in progress, enabling better task management.
 
 #### Working with "Template" Button:
+![Template image, template contains add and delete, replace current tasks with a template and replace template with current tasks buttons](images/template.jpg)
 - **Manage Template Tasks**: Accesses a separate set of tasks for templates.
 - **Add and Delete Template Tasks**:
   - **Add Template Tasks**: Specify task name and duration for future scheduling.
