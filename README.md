@@ -89,9 +89,10 @@ To get started with the bot, it's recommended to set up a virtual environment to
 
 #### Tasks view:
 ![tasks image](images/tasks.jpg)
-- \| means task in process
-- \~ means task is not in process, but not accomplished neither
-- \* means task was accomplished
+
+- \|  ⏳ task is in progress (not yet accomplished but actively being worked on)
+- \~  ❌ task is not done (pending or not started)
+- \*  ✅ task is done (completed)
 
 #### Interface Overview:
  ![Menu image, menu contains Working button and Template button](images/menu.jpg)
