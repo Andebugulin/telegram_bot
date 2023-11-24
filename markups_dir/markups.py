@@ -40,10 +40,11 @@ def custom_markup_for_working_add_activity() -> ReplyKeyboardMarkup:
     new_1_activity_btn = KeyboardButton(text='learning chess' + ' ' + str(10))
     new_2_activity_btn = KeyboardButton(text='Andrew Tate' + ' ' + str(210))
     menu_activity_btn = KeyboardButton(text="Menu")
+    back_activity_btn = KeyboardButton(text="Back")
 
     first_row = [new_1_activity_btn]
     second_row = [new_2_activity_btn] 
-    third_row = [menu_activity_btn]  
+    third_row = [menu_activity_btn, back_activity_btn]  
 
     key_board = [first_row, second_row, third_row]
 
@@ -94,7 +95,7 @@ def custom_markup_for_working_start_activity(task_dictionary: dict, chat_id: int
     for row in rows:
         key_board.append(row)
 
-    key_board.append([KeyboardButton(text='Menu')])
+    key_board.append([KeyboardButton(text='Menu'), KeyboardButton(text='Back')])
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=key_board, one_time_keyboard=False)
 
@@ -141,7 +142,7 @@ def custom_markup_for_working_delete_activity(task_dictionary: dict, chat_id: in
     for row in rows:
         key_board.append(row)
 
-    key_board.append([KeyboardButton(text='Menu')])
+    key_board.append([KeyboardButton(text='Menu'), KeyboardButton(text='Back')])
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=key_board, one_time_keyboard=False)
 
@@ -176,11 +177,12 @@ def custom_markup_for_template_add_activity() -> ReplyKeyboardMarkup:
     new_1_activity_btn = KeyboardButton(text='learning chess' + ' ' + str(10))
     new_2_activity_btn = KeyboardButton(text='Andrew Tate' + ' ' + str(210))
     menu_activity_btn = KeyboardButton(text="Menu")
+    back_activity_btn = KeyboardButton(text="Back")
 
 
     first_row = [new_1_activity_btn]
     second_row = [new_2_activity_btn] 
-    third_row = [menu_activity_btn]  
+    third_row = [menu_activity_btn, back_activity_btn]  
 
     key_board = [first_row, second_row, third_row]
 
@@ -229,7 +231,7 @@ def custom_markup_for_template_delete_activity(task_dictionary: dict, chat_id: i
     for row in rows:
         key_board.append(row)
 
-    key_board.append([KeyboardButton(text='Menu')])
+    key_board.append([KeyboardButton(text='Menu'), KeyboardButton(text='Back')])
 
     markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=key_board, one_time_keyboard=False)
 

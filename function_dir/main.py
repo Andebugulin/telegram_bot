@@ -311,6 +311,37 @@ async def deactivate_account(message: types.Message, state: FSMContext) -> None:
         
         await bot.send_message(chat_id, "<code> Sir, your account, OH NOO, SIR\n\n IT's successfully gone</code>", reply_markup=markup, parse_mode='HTML', disable_notification=True)
 
+@dp.message(F.text.strip() == 'Back')
+async def back_state_activity(message: types.Message, state: FSMContext) -> None: 
+    if await state.get_state() in (StepsForm.WORKING_ADD, StepsForm.WORKING_DELETE, StepsForm.WORKING_START):
+        chat_id = message.from_user.id
+        await state.set_state(StepsForm.WORKING)
+
+        markup = custom_markup_for_working()
+        task_dictionary[chat_id].check(datetime.datetime.now())
+        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        
+        CONSOLE = f'''\n 
+                        CONSOLE: Working\n
+                        STATE: Working\n
+                        CHAT_ID: {chat_id}\n
+               '''
+        print(CONSOLE)
+    elif await state.get_state() in (StepsForm.TEMPLATE_DELETE, StepsForm.TEMPLATE_ADD):
+        chat_id = message.from_user.id
+        await state.set_state(StepsForm.TEMPLATE)
+
+        markup = custom_markup_for_template()
+        task_dictionary[chat_id].check(datetime.datetime.now())
+        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nWhat do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+        
+        CONSOLE = f'''\n 
+                        CONSOLE: Menu\n
+                        STATE: Menu\n
+                        CHAT_ID: {chat_id}\n
+               '''
+        print(CONSOLE)
+
 @dp.message(F.text.strip() == 'Menu')
 async def menu_activity(message: types.Message, state: FSMContext) -> None: 
     if await state.get_state() != StepsForm.MENU:
@@ -680,7 +711,7 @@ async def action_over_time(current_time) -> None:
     date_time = current_time
     current_time = current_time.time()
     h, m = current_time.hour, current_time.minute
-    if current_time.hour == 21 and current_time.minute == 59: # night message
+    if current_time.hour == 21 and current_time.minute == 30: # night message
         # Send the scheduled message
         for chat_ids in list(task_dictionary.keys()):
             CONSOLE = f'''\n 
@@ -705,10 +736,10 @@ async def action_over_time(current_time) -> None:
                     print(CONSOLE)
                                        
 
-    if (current_time.hour != 1 and current_time.minute == 0) and \
-         (current_time.hour != 2 and current_time.minute == 0) and \
-         (current_time.hour != 3 and current_time.minute == 0) and \
-         (current_time.hour != 22 and current_time.minute == 0):
+    if (current_time.hour == 7 and current_time.minute == 0) and \
+         (current_time.hour != 11 and current_time.minute == 0) and \
+         (current_time.hour != 15 and current_time.minute == 0) and \
+         (current_time.hour != 19 and current_time.minute == 0):
         for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
@@ -731,7 +762,7 @@ async def action_over_time(current_time) -> None:
                                 we delete him {chat_ids}\n\n\n''' 
                     print(CONSOLE)
             
-    if (current_time.hour == 22 and current_time.minute == 0):
+    if (current_time.hour == 21 and current_time.minute == 40):
         for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
