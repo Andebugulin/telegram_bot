@@ -5,6 +5,11 @@
 \|   To streamline daily planning effortlessly   \| </br>
 \|   Make people feel better in general   \| </br></br> 
 \~   Ensures users efficiently organize their schedules    \~
+
+<p align="center">
+  <img src="./PlaniriumBot.png" alt="Wizard" width="600"/>
+</p>
+
 #### \*hassle-free\*
 
 
