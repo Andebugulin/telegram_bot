@@ -19,6 +19,8 @@ class ToDoList:
         ]
 
         self.tasks = [Task(task.name, task.remaining_time) for task in self.tasks_template]
+        self.rizz_enabled = False  # Default to enabled
+
 
 
     def __str__(self):
@@ -39,7 +41,7 @@ class ToDoList:
         return message
     
     def __dict__(self):
-        dictionary = {'chat_id': self.chat_id, 'template': {}, 'working': {}}
+        dictionary = {'chat_id': self.chat_id, 'template': {}, 'working': {},  'rizz_enabled': self.rizz_enabled} 
 
         task_template_dict = {}
         for task_t in self.tasks_template:
@@ -51,10 +53,13 @@ class ToDoList:
             working_dict[task.name] = task.__dict__()
         dictionary['working'] = working_dict
 
+        
+
         return dictionary
     
     def unpacking(self, dictionary:dict) -> None:
         self.chat_id = int(dictionary['chat_id'])
+        self.rizz_enabled = dictionary.get('rizz_enabled', True) 
         self.tasks_template = []
  
         for task_t in dictionary['template'].values():

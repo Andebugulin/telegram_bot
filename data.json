@@ -1,0 +1,46 @@
+{
+    "773603143": {
+        "chat_id": 773603143,
+        "template": {
+            "Programming": {
+                "name": "Programming",
+                "remaining_time": 10,
+                "going": false,
+                "last_time_hit_start_stop": "2024-12-13 20:25:49"
+            },
+            "Eating": {
+                "name": "Eating",
+                "remaining_time": 5,
+                "going": false,
+                "last_time_hit_start_stop": "2024-12-13 20:25:49"
+            },
+            "Neural Networks": {
+                "name": "Neural Networks",
+                "remaining_time": 3,
+                "going": false,
+                "last_time_hit_start_stop": "2024-12-13 20:25:49"
+            }
+        },
+        "working": {
+            "Programming": {
+                "name": "Programming",
+                "remaining_time": 10,
+                "going": false,
+                "last_time_hit_start_stop": "2025-02-27 10:55:55"
+            },
+            "Eating": {
+                "name": "Eating",
+                "remaining_time": 5,
+                "going": false,
+                "last_time_hit_start_stop": "2025-02-27 10:55:55"
+            },
+            "Neural Networks": {
+                "name": "Neural Networks",
+                "remaining_time": 3,
+                "going": false,
+                "last_time_hit_start_stop": "2025-02-27 10:55:55"
+            }
+        },
+        "rizz_enabled": true
+    }
+}

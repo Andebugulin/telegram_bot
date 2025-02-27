@@ -4,7 +4,8 @@ def custom_markup_for_the_menu() -> ReplyKeyboardMarkup:
     CONSOLE = '\n CONSOLE: custom_markup_for_the_menu was used\n'
     print(CONSOLE)
     deactivate_account_btn = KeyboardButton(text="DEACTIVATE")
-    first_row = [deactivate_account_btn]
+    toggle_rizz_btn = KeyboardButton(text="Rizz")  # Add this line
+    first_row = [deactivate_account_btn, toggle_rizz_btn]  # Modify this line
     
     working_activity_btn = KeyboardButton(text="Working")
     template_activity_btn = KeyboardButton(text="Template")

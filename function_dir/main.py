@@ -1,3 +1,8 @@
+import sys
+import os
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 import logging
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
@@ -15,6 +20,7 @@ import random
 from classes_dir.to_do_list_class import ToDoList
 from classes_dir.task_class import Task
 from markups_dir.markups import *
+
 
 
 
@@ -294,6 +300,14 @@ async def cmd_start(message: types.Message, state: FSMContext) -> None:
     markup = custom_markup_for_the_menu()
 
     await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+
+@dp.message(F.text.strip() == 'Rizz')
+async def toggle_rizz(message: types.Message):
+    chat_id = message.from_user.id
+    if chat_id in task_dictionary:
+        task_dictionary[chat_id].rizz_enabled = not task_dictionary[chat_id].rizz_enabled
+        status = "enabled" if task_dictionary[chat_id].rizz_enabled else "disabled"
+        await bot.send_message(chat_id, f"Rizz feature is now {status}.", disable_notification=True)
 
 @dp.message(F.text.strip() == 'DEACTIVATE')
 async def deactivate_account(message: types.Message, state: FSMContext) -> None: 
@@ -714,6 +728,8 @@ async def action_over_time(current_time) -> None:
     if current_time.hour == 21 and current_time.minute == 30: # night message
         # Send the scheduled message
         for chat_ids in list(task_dictionary.keys()):
+            if not task_dictionary[chat_ids].rizz_enabled:
+                continue  # Skip if rizz is disabled
             CONSOLE = f'''\n 
                         CONSOLE: sending user scheduled message <good night message>\n
                         CHAT_ID: {chat_ids}\n
