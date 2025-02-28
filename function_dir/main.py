@@ -724,61 +724,20 @@ async def action_over_time(current_time) -> None:
     global task_dictionary
     date_time = current_time
     current_time = current_time.time()
-    h, m = current_time.hour, current_time.minute
-    if current_time.hour == 21 and current_time.minute == 30: # night message
-        # Send the scheduled message
-        for chat_ids in list(task_dictionary.keys()):
-            if not task_dictionary[chat_ids].rizz_enabled:
-                continue  # Skip if rizz is disabled
-            CONSOLE = f'''\n 
-                        CONSOLE: sending user scheduled message <good night message>\n
-                        CHAT_ID: {chat_ids}\n
-               '''
+    
+    # Helper function to handle blocked users
+    async def handle_blocked_user(chat_ids, e):
+        if 'forbidden: bot was blocked' in str(e).lower():
+            del task_dictionary[chat_ids]
+            CONSOLE = f'''\n\n\n
+                        CHAT_ID blocked us,\n
+                        we delete him {chat_ids}\n\n\n''' 
             print(CONSOLE)
-            task_dictionary[chat_ids].check(date_time)
-            try:
-                await bot.send_message(chat_ids, f'''\n 
-                                                \U0001FA90 {random.choice(list(good_night_sentences))}
-                                                \n\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n
-                                                    <strong>I Love You</strong> ''', 
-                                    parse_mode='HTML', 
-                                    disable_notification=True)  
-            except Exception as e:
-                if 'forbidden: bot was blocked' in str(e).lower():
-                    del task_dictionary[chat_ids]
-                    CONSOLE = f'''\n\n\n
-                                CHAT_ID blocked us,\n
-                                we delete him {chat_ids}\n\n\n''' 
-                    print(CONSOLE)
-                                       
-
-    if (current_time.hour == 7 and current_time.minute == 0) and \
-         (current_time.hour != 11 and current_time.minute == 0) and \
-         (current_time.hour != 15 and current_time.minute == 0) and \
-         (current_time.hour != 19 and current_time.minute == 0):
-        for chat_ids in list(task_dictionary.keys()):
-            task_dictionary[chat_ids].check(date_time)
-            CONSOLE = f'''\n 
-                        CONSOLE: sending user scheduled message <success, so far>\n
-                        CHAT_ID: {chat_ids}\n
-               '''
-            print(CONSOLE)
-            try:
-                await bot.send_message(
-                chat_ids,
-                task_dictionary[chat_ids].__str__() + '\n\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i>your progress</i> \n\n<code>Great job</code>",
-                parse_mode='HTML',
-                disable_notification=True
-                                    ) 
-            except Exception as e:
-                if 'forbidden: bot was blocked' in str(e).lower():
-                    del task_dictionary[chat_ids]
-                    CONSOLE = f'''\n\n\n
-                                CHAT_ID blocked us,\n
-                                we delete him {chat_ids}\n\n\n''' 
-                    print(CONSOLE)
-            
-    if (current_time.hour == 21 and current_time.minute == 40):
+            return True
+        return False
+    
+    # END OF DAY - Evening success message at 21:40
+    if current_time.hour == 23 and current_time.minute == 0:
         for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
@@ -787,21 +746,25 @@ async def action_over_time(current_time) -> None:
                '''
             print(CONSOLE)
             try:
+                base_message = task_dictionary[chat_ids].__str__() + '\n\n\n'
+                
+                # Include pickup line only if rizz is enabled
+                if task_dictionary[chat_ids].rizz_enabled:
+                    base_message += f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n"
+                
+                base_message += "<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>"
+                
                 await bot.send_message(
-                chat_ids,
-                task_dictionary[chat_ids].__str__() + '\n\n\n' + f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>",
-                parse_mode='HTML',
-                disable_notification=True
-                                    )   
+                    chat_ids,
+                    base_message,
+                    parse_mode='HTML',
+                    disable_notification=True
+                )   
             except Exception as e:
-                if 'forbidden: bot was blocked' in str(e).lower():
-                    del task_dictionary[chat_ids]
-                    CONSOLE = f'''\n\n\n
-                                CHAT_ID blocked us,\n
-                                we delete him {chat_ids}\n\n\n''' 
-                    print(CONSOLE)
+                await handle_blocked_user(chat_ids, e)
                
-    if (current_time.hour == 1 and current_time.minute == 0): # 03:00
+    # RESET TASKS - Reset tasks at 1:00 AM
+    if current_time.hour == 1 and current_time.minute == 0:  # 01:00 AM
         for chat_ids in list(task_dictionary.keys()):
             task_dictionary[chat_ids].check(date_time)
             CONSOLE = f'''\n 
@@ -812,14 +775,20 @@ async def action_over_time(current_time) -> None:
             task_dictionary[chat_ids].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_ids].tasks_template]
             
             try:
-                await bot.send_message(chat_ids, f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n Your tasks for today have been set up", parse_mode='HTML', disable_notification=True)
+                base_message = "Your tasks for today have been set up"
+                
+                # Include pickup line only if rizz is enabled
+                if task_dictionary[chat_ids].rizz_enabled:
+                    base_message = f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n" + base_message
+                
+                await bot.send_message(
+                    chat_ids, 
+                    base_message, 
+                    parse_mode='HTML', 
+                    disable_notification=True
+                )
             except Exception as e:
-                if 'forbidden: bot was blocked' in str(e).lower():
-                    del task_dictionary[chat_ids]
-                    CONSOLE = f'''\n\n\n
-                                CHAT_ID blocked us,\n
-                                we delete him {chat_ids}\n\n\n''' 
-                    print(CONSOLE)
+                await handle_blocked_user(chat_ids, e)
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
