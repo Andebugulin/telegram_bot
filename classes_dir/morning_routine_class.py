@@ -3,10 +3,11 @@ import pytz
 from typing import List, Dict, Optional
 
 class RoutineTask:
-    def __init__(self, name: str, duration: int, optional: bool = False):
+    def __init__(self, name: str, duration: int, optional: bool = False, notes: str = ""):
         self.name = name
-        self.duration = duration  # minutes
+        self.duration = duration
         self.optional = optional
+        self.notes = notes
         self.completed = False
         self.completed_at = None
     
@@ -23,18 +24,18 @@ class RoutineTask:
             'name': self.name,
             'duration': self.duration,
             'optional': self.optional,
+            'notes': self.notes,
             'completed': self.completed,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
         }
     
     @classmethod
     def from_dict(cls, data):
-        task = cls(data['name'], data['duration'], data.get('optional', False))
+        task = cls(data['name'], data['duration'], data.get('optional', False), data.get('notes', ''))
         task.completed = data.get('completed', False)
         if data.get('completed_at'):
             task.completed_at = datetime.datetime.fromisoformat(data['completed_at'])
         return task
-
 
 class MorningRoutine:
     def __init__(self, chat_id: int):
@@ -43,37 +44,106 @@ class MorningRoutine:
         self.current_streak = 0
         self.best_streak = 0
         self.total_completions = 0
-        self.history: Dict[str, Dict] = {}  # date -> {completion: %, tasks: [], duration: mins}
+        self.history: Dict[str, Dict] = {}
         self.routine_started = False
         self.start_time = None
         self.is_setup_complete = False
+        self.paused = False
+        self.pause_time = None
+        self.total_pause_duration = 0
+        # Customizable time window (hours)
+        self.window_start = 5
+        self.window_end = 11
     
-    def add_task(self, name: str, duration: int, optional: bool = False):
-        if len(self.tasks) < 15:  # max 15 tasks
-            self.tasks.append(RoutineTask(name, duration, optional))
-            return True
-        return False
+    def add_task(self, name: str, duration: int, optional: bool = False, notes: str = "") -> tuple[bool, str]:
+        """Add task with validation. Returns (success, error_message)"""
+        if len(self.tasks) >= 15:
+            return False, "Max 15 tasks"
+        if not name or not name.strip():
+            return False, "Task name required"
+        if duration <= 0:
+            return False, "Duration must be positive"
+        if duration > 999:
+            return False, "Duration too long (max 999)"
+        
+        self.tasks.append(RoutineTask(name.strip(), duration, optional, notes))
+        return True, ""
     
-    def remove_task(self, index: int):
+    def remove_task(self, index: int) -> bool:
         if 0 <= index < len(self.tasks):
             self.tasks.pop(index)
             return True
         return False
+    
+    def edit_task(self, index: int, name: str = None, duration: int = None, 
+                  optional: bool = None, notes: str = None) -> tuple[bool, str]:
+        """Edit task properties. Returns (success, error_message)"""
+        if not (0 <= index < len(self.tasks)):
+            return False, "Invalid task number"
+        
+        task = self.tasks[index]
+        
+        if name is not None:
+            if not name.strip():
+                return False, "Name cannot be empty"
+            task.name = name.strip()
+        
+        if duration is not None:
+            if duration <= 0:
+                return False, "Duration must be positive"
+            if duration > 999:
+                return False, "Duration too long"
+            task.duration = duration
+        
+        if optional is not None:
+            task.optional = optional
+        
+        if notes is not None:
+            task.notes = notes
+        
+        return True, ""
+    
+    def move_task(self, from_index: int, to_index: int) -> bool:
+        """Reorder tasks"""
+        if not (0 <= from_index < len(self.tasks) and 0 <= to_index < len(self.tasks)):
+            return False
+        task = self.tasks.pop(from_index)
+        self.tasks.insert(to_index, task)
+        return True
     
     def start_routine(self):
         if not self.can_start_routine():
             return False
         self.routine_started = True
         self.start_time = datetime.datetime.now(pytz.UTC)
-        # Reset all tasks
+        self.paused = False
+        self.total_pause_duration = 0
         for task in self.tasks:
             task.reset()
         return True
     
     def can_start_routine(self) -> bool:
-        """Check if it's within morning window (5 AM - 11 AM local time)"""
+        """Check if within time window"""
         now = datetime.datetime.now()
-        return 5 <= now.hour < 11
+        return self.window_start <= now.hour < self.window_end
+    
+    def pause_routine(self):
+        """Pause routine"""
+        if self.routine_started and not self.paused:
+            self.paused = True
+            self.pause_time = datetime.datetime.now(pytz.UTC)
+            return True
+        return False
+    
+    def resume_routine(self):
+        """Resume routine"""
+        if self.routine_started and self.paused:
+            pause_duration = (datetime.datetime.now(pytz.UTC) - self.pause_time).total_seconds()
+            self.total_pause_duration += pause_duration
+            self.paused = False
+            self.pause_time = None
+            return True
+        return False
     
     def complete_task(self, index: int) -> bool:
         if 0 <= index < len(self.tasks):
@@ -91,22 +161,24 @@ class MorningRoutine:
         return (completed / len(required_tasks)) * 100
     
     def finish_routine(self):
-        """Call when user finishes routine"""
         if not self.routine_started:
             return False
         
         completion = self.get_completion_percentage()
-        duration = (datetime.datetime.now(pytz.UTC) - self.start_time).total_seconds() / 60
+        
+        # Calculate actual duration (excluding pauses)
+        total_seconds = (datetime.datetime.now(pytz.UTC) - self.start_time).total_seconds()
+        active_duration = (total_seconds - self.total_pause_duration) / 60
         
         today = datetime.date.today().isoformat()
         self.history[today] = {
             'completion': completion,
-            'duration': int(duration),
+            'duration': int(active_duration),
             'tasks': [t.to_dict() for t in self.tasks]
         }
         
-        # Update streaks
-        if completion >= 80:  # 80% = streak counts
+        # Streak: 80%+ = maintain, else reset
+        if completion >= 80:
             self.current_streak += 1
             self.total_completions += 1
             if self.current_streak > self.best_streak:
@@ -115,14 +187,14 @@ class MorningRoutine:
             self.current_streak = 0
         
         self.routine_started = False
+        self.paused = False
         return True
     
     def check_missed_routine(self):
-        """Check if user missed today's routine (called after 11 AM)"""
         now = datetime.datetime.now()
         today = datetime.date.today().isoformat()
         
-        if now.hour >= 11 and today not in self.history:
+        if now.hour >= self.window_end and today not in self.history:
             self.history[today] = {
                 'completion': 0,
                 'duration': 0,
@@ -132,7 +204,6 @@ class MorningRoutine:
             self.current_streak = 0
     
     def get_weekly_stats(self):
-        """Get last 7 days statistics"""
         last_7_days = []
         for i in range(6, -1, -1):
             date = (datetime.date.today() - datetime.timedelta(days=i)).isoformat()
@@ -150,43 +221,36 @@ class MorningRoutine:
         }
     
     def get_status_display(self) -> str:
-        """Format current routine status for display with aligned times"""
         lines = []
         
         if self.routine_started:
-            elapsed = (datetime.datetime.now(pytz.UTC) - self.start_time).total_seconds() / 60
-            header = f"ROUTINE · {int(elapsed)}m"
+            if self.paused:
+                elapsed = (self.pause_time - self.start_time).total_seconds() / 60
+                header = f"PAUSED · {int(elapsed)}m"
+            else:
+                elapsed = (datetime.datetime.now(pytz.UTC) - self.start_time).total_seconds() / 60
+                elapsed -= (self.total_pause_duration / 60)
+                header = f"ROUTINE · {int(elapsed)}m"
         else:
             header = "ROUTINE"
         
-        # Header with box
         lines.append(f"┏━━━━━━━━━━━━━━━━━━━━┓\n")
         lines.append(f"                 {header:^18}  \n")
         lines.append(f"┗━━━━━━━━━━━━━━━━━━━━┛\n\n")
         
-        # Find longest task name for alignment
         if self.tasks:
             max_name_length = max(len(t.name) for t in self.tasks)
         else:
             max_name_length = 0
         
-        # Build task list with proper alignment using inline code
         for i, task in enumerate(self.tasks, 1):
             status = "✓" if task.completed else "○"
             opt = " `opt`" if task.optional else ""
-            
-            # Calculate padding to align times (each char = 1 space in monospace)
             padding = max_name_length - len(task.name)
-            # Use hair space (U+200A) which Telegram preserves better
             spaces = "\u2009" * padding
             
-            if task.completed:
-                # Strikethrough for completed tasks
-                lines.append(f"{status} `{task.name}{spaces}  {task.duration}m`{opt}\n")
-            else:
-                lines.append(f"{status} `{task.name}{spaces}  {task.duration}m`{opt}\n")
+            lines.append(f"{status} `{task.name}{spaces}  {task.duration}m`{opt}\n")
         
-        # Footer with completion and streak
         if self.routine_started:
             completion = self.get_completion_percentage()
             lines.append(f"\n`{completion:.0f}%` complete")
@@ -206,7 +270,12 @@ class MorningRoutine:
             'history': self.history,
             'routine_started': self.routine_started,
             'start_time': self.start_time.isoformat() if self.start_time else None,
-            'is_setup_complete': self.is_setup_complete
+            'is_setup_complete': self.is_setup_complete,
+            'paused': self.paused,
+            'pause_time': self.pause_time.isoformat() if self.pause_time else None,
+            'total_pause_duration': self.total_pause_duration,
+            'window_start': self.window_start,
+            'window_end': self.window_end
         }
     
     @classmethod
@@ -221,4 +290,10 @@ class MorningRoutine:
         if data.get('start_time'):
             routine.start_time = datetime.datetime.fromisoformat(data['start_time'])
         routine.is_setup_complete = data.get('is_setup_complete', False)
+        routine.paused = data.get('paused', False)
+        if data.get('pause_time'):
+            routine.pause_time = datetime.datetime.fromisoformat(data['pause_time'])
+        routine.total_pause_duration = data.get('total_pause_duration', 0)
+        routine.window_start = data.get('window_start', 5)
+        routine.window_end = data.get('window_end', 11)
         return routine

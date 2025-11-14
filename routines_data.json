@@ -7,6 +7,7 @@
           "name": "Wake up",
           "duration": 2,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -14,6 +15,7 @@
           "name": "Drink water",
           "duration": 1,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -21,6 +23,7 @@
           "name": "Walk outside",
           "duration": 5,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -28,6 +31,7 @@
           "name": "Voice",
           "duration": 15,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -35,6 +39,7 @@
           "name": "Breakfast",
           "duration": 30,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -42,6 +47,7 @@
           "name": "Shower",
           "duration": 10,
           "optional": true,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -49,6 +55,7 @@
           "name": "Anki",
           "duration": 25,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -56,6 +63,7 @@
           "name": "Stretch",
           "duration": 15,
           "optional": true,
+          "notes": "",
           "completed": false,
           "completed_at": null
         },
@@ -63,6 +71,7 @@
           "name": "Finnish",
           "duration": 60,
           "optional": false,
+          "notes": "",
           "completed": false,
           "completed_at": null
         }
@@ -73,15 +82,18 @@
       "history": {},
       "routine_started": false,
       "start_time": null,
-      "is_setup_complete": true
+      "is_setup_complete": true,
+      "paused": false,
+      "pause_time": null,
+      "total_pause_duration": 0,
+      "window_start": 6,
+      "window_end": 12
     }
   },
   "user_replies": {
     "773603143": [
       "Done",
       "Next",
-      "Complete",
-      "Ok",
       "Great"
     ]
   }

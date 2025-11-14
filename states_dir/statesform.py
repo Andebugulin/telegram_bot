@@ -21,3 +21,5 @@ class StepsForm(StatesGroup):
     SETTINGS = State()
     SETTINGS_EDIT_ROUTINE = State()
     SETTINGS_CUSTOMIZE_REPLIES = State()  # ADD THIS LINE
+    SETTINGS_EDIT_TASK = State()  # For editing individual tasks
+    SETTINGS_EDIT_WINDOW = State()

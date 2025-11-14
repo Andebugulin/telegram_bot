@@ -628,87 +628,13 @@ Customize experience
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Edit Routine")],
-            [KeyboardButton(text="Quick Replies")],
+            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
             [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
             [KeyboardButton(text="Menu")]
         ]
     )
     
     await bot.send_message(chat_id, text, reply_markup=markup)
-
-@dp.message(StepsForm.SETTINGS, F.text == "Edit Routine")
-async def edit_routine(message: types.Message, state: FSMContext):
-    chat_id = message.from_user.id
-    routine = routines_dict[chat_id]
-    
-    await state.set_state(StepsForm.SETTINGS_EDIT_ROUTINE)
-    
-    tasks_list = "\n".join([
-        f"`{i+1}.` {t.name} `{t.duration}m`{' `opt`' if t.optional else ''}"
-        for i, t in enumerate(routine.tasks)
-    ])
-    
-    text = make_header("EDIT ROUTINE") + f"""
-*Your Tasks:*
-{tasks_list}
-
-{SEPARATOR_LIGHT}
-
-*Commands:*
-Type number to remove
-`add task duration`
-`add task duration optional`
-"""
-    
-    markup = ReplyKeyboardMarkup(
-        resize_keyboard=True,
-        keyboard=[[KeyboardButton(text="Back")]]
-    )
-    
-    await bot.send_message(chat_id, text, reply_markup=markup)
-
-
-@dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
-async def handle_edit_routine(message: types.Message, state: FSMContext):
-    chat_id = message.from_user.id
-    routine = routines_dict[chat_id]
-    text = message.text.strip()
-    
-    if text == "Back":
-        await show_settings(message, state)
-        return
-    
-    # Remove task
-    if text.isdigit():
-        task_num = int(text) - 1
-        if routine.remove_task(task_num):
-            save_routines()
-            await bot.send_message(chat_id, "`Removed`")
-            await edit_routine(message, state)
-        else:
-            await bot.send_message(chat_id, "`Invalid number`")
-    
-    # Add task
-    elif text.lower().startswith("add "):
-        try:
-            parts = text[4:].strip().split()
-            optional = parts[-1].lower() == "optional"
-            if optional:
-                parts = parts[:-1]
-            
-            duration = int(parts[-1])
-            task_name = " ".join(parts[:-1])
-            
-            if routine.add_task(task_name, duration, optional):
-                save_routines()
-                await bot.send_message(chat_id, f"`Added: {task_name}`")
-                await edit_routine(message, state)
-            else:
-                await bot.send_message(chat_id, "`Max 15 tasks`")
-        except (ValueError, IndexError):
-            await bot.send_message(chat_id, "`Invalid format`")
-    else:
-        await bot.send_message(chat_id, "`Invalid command`")
 
 @dp.message(StepsForm.SETTINGS, F.text == "Quick Replies")
 async def customize_replies(message: types.Message, state: FSMContext):
@@ -739,6 +665,418 @@ Customize watch responses
     )
     
     await bot.send_message(chat_id, text, reply_markup=markup)
+
+@dp.message(StepsForm.SETTINGS, F.text == "Edit Routine")
+async def edit_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_ROUTINE)
+    
+    # Calculate max name length for alignment
+    if routine.tasks:
+        max_name_length = max(len(t.name) for t in routine.tasks)
+    else:
+        max_name_length = 0
+    
+    # Build task list with monospace alignment
+    task_lines = []
+    for i, task in enumerate(routine.tasks):
+        padding = max_name_length - len(task.name)
+        spaces = "\u2009" * padding
+        opt_label = "  opt" if task.optional else ""
+        task_lines.append(f"`{i+1}. {task.name}{spaces}  {task.duration}m{opt_label}`")
+    
+    tasks_list = "\n".join(task_lines)
+    
+    text = make_header("EDIT ROUTINE") + f"""
+*Your Tasks:*
+{tasks_list}
+
+{SEPARATOR_LIGHT}
+
+*Commands:*
+`delete N` - remove task N
+`edit N` - modify task N
+`move N M` - reorder (N to pos M)
+`add name duration` - add task
+`add name duration optional`
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="edit 1")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
+async def handle_edit_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip().lower()
+    
+    if text == "back":
+        await show_settings(message, state)
+        return
+    
+    parts = text.split()
+    
+    # Delete task: "delete 1"
+    if parts[0] == "delete" and len(parts) == 2:
+        try:
+            task_num = int(parts[1]) - 1
+            if routine.remove_task(task_num):
+                save_routines()
+                await bot.send_message(chat_id, "`Removed`")
+                await edit_routine(message, state)
+            else:
+                await bot.send_message(chat_id, "`Invalid number`")
+        except ValueError:
+            await bot.send_message(chat_id, "`Invalid format`")
+    
+    # Edit task: "edit 1"
+    elif parts[0] == "edit" and len(parts) == 2:
+        try:
+            task_num = int(parts[1]) - 1
+            if 0 <= task_num < len(routine.tasks):
+                await state.update_data(editing_task_index=task_num)
+                await state.set_state(StepsForm.SETTINGS_EDIT_TASK)
+                
+                task = routine.tasks[task_num]
+                text = make_header(f"EDIT TASK {task_num + 1}") + f"""
+*Current:*
+Name: `{task.name}`
+Duration: `{task.duration}m`
+Optional: `{task.optional}`
+Notes: `{task.notes or 'none'}`
+
+{SEPARATOR_LIGHT}
+
+*Change property:*
+`name new name here`
+`duration 15`
+`optional true/false`
+`notes your note here`
+"""
+                
+                markup = ReplyKeyboardMarkup(
+                    resize_keyboard=True,
+                    keyboard=[
+                        [KeyboardButton(text="name Wake up early")],
+                        [KeyboardButton(text="duration 30")],
+                        [KeyboardButton(text="Done"), KeyboardButton(text="Back")]
+                    ]
+                )
+                
+                await bot.send_message(chat_id, text, reply_markup=markup)
+            else:
+                await bot.send_message(chat_id, "`Invalid task number`")
+        except ValueError:
+            await bot.send_message(chat_id, "`Invalid format`")
+    
+    # Move task: "move 1 3"
+    elif parts[0] == "move" and len(parts) == 3:
+        try:
+            from_idx = int(parts[1]) - 1
+            to_idx = int(parts[2]) - 1
+            if routine.move_task(from_idx, to_idx):
+                save_routines()
+                await bot.send_message(chat_id, "`Moved`")
+                await edit_routine(message, state)
+            else:
+                await bot.send_message(chat_id, "`Invalid positions`")
+        except ValueError:
+            await bot.send_message(chat_id, "`Invalid format`")
+    
+    # Add task: "add taskname 30" or "add taskname 30 optional"
+    elif parts[0] == "add" and len(parts) >= 3:
+        try:
+            optional = parts[-1] == "optional"
+            if optional:
+                parts = parts[:-1]
+            
+            duration = int(parts[-1])
+            task_name = " ".join(parts[1:-1])
+            
+            success, error = routine.add_task(task_name, duration, optional)
+            if success:
+                save_routines()
+                await bot.send_message(chat_id, f"`Added: {task_name}`")
+                await edit_routine(message, state)
+            else:
+                await bot.send_message(chat_id, f"`{error}`")
+        except (ValueError, IndexError):
+            await bot.send_message(chat_id, "`Invalid format`")
+    else:
+        await bot.send_message(chat_id, "`Invalid command`")
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_TASK)
+async def handle_edit_task_property(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text.lower() == "back":
+        await state.set_state(StepsForm.SETTINGS_EDIT_ROUTINE)
+        await edit_routine(message, state)
+        return
+    
+    if text.lower() == "done":
+        save_routines()
+        await state.set_state(StepsForm.SETTINGS_EDIT_ROUTINE)
+        await bot.send_message(chat_id, "`Changes saved`")
+        await edit_routine(message, state)
+        return
+    
+    data = await state.get_data()
+    task_idx = data.get('editing_task_index')
+    
+    if task_idx is None:
+        await bot.send_message(chat_id, "`Error: no task selected`")
+        return
+    
+    parts = text.split(maxsplit=1)
+    if len(parts) < 2:
+        await bot.send_message(chat_id, "`Format: property value`")
+        return
+    
+    prop, value = parts[0].lower(), parts[1]
+    
+    if prop == "name":
+        success, error = routine.edit_task(task_idx, name=value)
+    elif prop == "duration":
+        try:
+            success, error = routine.edit_task(task_idx, duration=int(value))
+        except ValueError:
+            await bot.send_message(chat_id, "`Duration must be a number`")
+            return
+    elif prop == "optional":
+        optional_val = value.lower() in ['true', 'yes', '1']
+        success, error = routine.edit_task(task_idx, optional=optional_val)
+    elif prop == "notes":
+        success, error = routine.edit_task(task_idx, notes=value)
+    else:
+        await bot.send_message(chat_id, "`Unknown property`")
+        return
+    
+    if success:
+        await bot.send_message(chat_id, f"`Updated {prop}`")
+    else:
+        await bot.send_message(chat_id, f"`{error}`")
+
+
+# Add pause/resume functionality to routine handlers:
+
+@dp.message(StepsForm.ROUTINE_ACTIVE_WAITING)
+async def handle_task_response(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text == "Menu":
+        await show_main_menu(chat_id, state)
+        return
+    
+    if text == "Pause":
+        if routine.pause_routine():
+            save_routines()
+            await bot.send_message(chat_id, "`Routine paused`")
+            await show_main_menu(chat_id, state)
+        return
+    
+    if text == "Skip":
+        await send_next_task(chat_id, state)
+        return
+    
+    # Any other response = complete task
+    for i, task in enumerate(routine.tasks):
+        if not task.completed:
+            routine.complete_task(i)
+            save_routines()
+            break
+    
+    await send_next_task(chat_id, state)
+
+
+async def send_next_task(chat_id: int, state: FSMContext):
+    routine = routines_dict[chat_id]
+    
+    next_task = None
+    task_num = None
+    for i, task in enumerate(routine.tasks):
+        if not task.completed:
+            next_task = task
+            task_num = i + 1
+            break
+    
+    if next_task:
+        await state.set_state(StepsForm.ROUTINE_ACTIVE_WAITING)
+        
+        remaining = sum(1 for t in routine.tasks if not t.completed)
+        completion = routine.get_completion_percentage()
+        
+        opt_label = " `opt`" if next_task.optional else ""
+        notes_text = f"\n_{next_task.notes}_\n" if next_task.notes else "\n"
+        
+        total_tasks = len([t for t in routine.tasks if not t.optional])
+        completed_tasks = total_tasks - remaining
+        progress_bar = make_progress_bar((completed_tasks / total_tasks) * 100, 20)
+        
+        text = make_header(f"TASK {task_num}") + f"""
+*{next_task.name}*
+`{next_task.duration} minutes`{opt_label}
+{notes_text}
+{progress_bar}
+`{completion:.0f}%` · `{remaining} left`
+"""
+        
+        replies = user_replies.get(chat_id, DEFAULT_REPLIES)
+        buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
+        buttons.append([KeyboardButton(text="Skip"), KeyboardButton(text="Pause")])
+        buttons.append([KeyboardButton(text="Menu")])
+        
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
+        
+        await bot.send_message(chat_id, text, reply_markup=markup, disable_notification=True)
+    else:
+        await finish_routine_confirmed(chat_id, state)
+
+
+# Add time window customization:
+
+@dp.message(StepsForm.SETTINGS, F.text == "Time Window")
+async def customize_window(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_WINDOW)
+    
+    text = make_header("TIME WINDOW") + f"""
+*Current:*
+`{routine.window_start:02d}:00 - {routine.window_end:02d}:00`
+
+{SEPARATOR_LIGHT}
+
+*Change window:*
+`window 6 12` (6 AM - 12 PM)
+`window 5 10` (5 AM - 10 AM)
+
+Hours: 0-23
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="window 6 12")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_WINDOW)
+async def handle_window_change(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip().lower()
+    
+    if text == "back":
+        await show_settings(message, state)
+        return
+    
+    parts = text.split()
+    if len(parts) == 3 and parts[0] == "window":
+        try:
+            start = int(parts[1])
+            end = int(parts[2])
+            
+            if 0 <= start < 24 and 0 <= end <= 24 and start < end:
+                routine.window_start = start
+                routine.window_end = end
+                save_routines()
+                await bot.send_message(
+                    chat_id, 
+                    f"`Window: {start:02d}:00 - {end:02d}:00`"
+                )
+                await show_settings(message, state)
+            else:
+                await bot.send_message(chat_id, "`Invalid hours (0-23, start < end)`")
+        except ValueError:
+            await bot.send_message(chat_id, "`Invalid format`")
+    else:
+        await bot.send_message(chat_id, "`Format: window START END`")
+
+
+# Update settings menu to include new options:
+
+@dp.message(StepsForm.MENU, F.text == "Settings")
+async def show_settings(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    await state.set_state(StepsForm.SETTINGS)
+    
+    text = make_header("SETTINGS") + """
+Configure your routine
+Customize experience
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Edit Routine")],
+            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
+            [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
+            [KeyboardButton(text="Menu")]
+        ],
+        one_time_keyboard=False
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+# Update menu to show "Resume" button if paused:
+
+async def show_main_menu(chat_id: int, state: FSMContext):
+    await state.set_state(StepsForm.MENU)
+    routine = routines_dict[chat_id]
+    
+    status = routine.get_status_display()
+    
+    buttons = []
+    
+    if routine.routine_started and routine.paused:
+        buttons.append([KeyboardButton(text="Resume")])
+    elif routine.can_start_routine() and not routine.routine_started:
+        buttons.append([KeyboardButton(text="Start Routine")])
+    elif routine.routine_started:
+        buttons.append([KeyboardButton(text="Continue")])
+    
+    buttons.extend([
+        [KeyboardButton(text="Stats"), KeyboardButton(text="Settings")]
+    ])
+    
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
+    
+    await bot.send_message(chat_id, status, reply_markup=markup)
+
+
+@dp.message(StepsForm.MENU, F.text == "Resume")
+async def resume_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    if routine.resume_routine():
+        save_routines()
+        await state.set_state(StepsForm.ROUTINE_ACTIVE)
+        await send_next_task(chat_id, state)
+    else:
+        await bot.send_message(chat_id, "`Cannot resume`")
 
 @dp.message(StepsForm.SETTINGS_CUSTOMIZE_REPLIES)
 async def handle_customize_replies(message: types.Message, state: FSMContext):
