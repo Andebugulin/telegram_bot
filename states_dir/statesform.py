@@ -2,12 +2,22 @@ from aiogram.fsm.state import StatesGroup, State
 
 
 class StepsForm(StatesGroup):
+    # Initial setup
+    SETUP_INTRO = State()
+    SETUP_ADD_TASK = State()
+    SETUP_CONFIRM = State()
+    
+    # Main menu
     MENU = State()
-
-    TEMPLATE = State()
-    TEMPLATE_ADD = State()
-    TEMPLATE_DELETE = State()
-    WORKING = State()
-    WORKING_START = State()
-    WORKING_ADD = State()
-    WORKING_DELETE = State()
+    
+    # During routine
+    ROUTINE_ACTIVE = State()
+    ROUTINE_ACTIVE_WAITING = State()  # ADD THIS LINE
+    
+    # Stats
+    STATS_VIEW = State()
+    
+    # Settings
+    SETTINGS = State()
+    SETTINGS_EDIT_ROUTINE = State()
+    SETTINGS_CUSTOMIZE_REPLIES = State()  # ADD THIS LINE

@@ -8,711 +8,870 @@ import asyncio
 from aiogram import Bot, Dispatcher, types, F
 import json
 from dotenv import load_dotenv
-import os
-from telebot import types
 import datetime
 from aiogram.filters.command import Command
 from aiogram.fsm.context import FSMContext
 from states_dir.statesform import StepsForm
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-import json
-import random
-from classes_dir.to_do_list_class import ToDoList
-from classes_dir.task_class import Task
-from markups_dir.markups import *
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+from classes_dir.morning_routine_class import MorningRoutine
 
-
-
-
-# * loading env, 
-# * you can create .env file and put there your 'BOT_TOKEN' variable
+# Load environment
 load_dotenv()
 
-# * logging helps to check follow whether everything is working properly.
+# Logging
 logging.basicConfig(level=logging.INFO)
 
-# Initialize your Telegram Bot Token
-# ! don't you ever put a token to the code !!!!!!
+# Bot initialization
 bot_token = str(os.getenv("BOT_TOKEN"))
-
-# Initialize the bot
-bot = Bot(token=bot_token)
-
-# dispatcher
+bot = Bot(token=bot_token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
 dp = Dispatcher()
 
-good_night_sentences = {
-    "Wishing you a peaceful night filled with sweet dreams.",
-    "May the stars whisper lullabies to guide you into a restful sleep.",
-    "As the night falls, may your worries fade away, and your dreams be filled with joy.",
-    "Sending you a blanket of stars to keep you warm tonight.",
-    "Close your eyes and let the serenity of the night embrace you.",
-    "Sleep tight, dream big, and wake up ready to conquer tomorrow.",
-    "May your dreams be as beautiful as the night sky.",
-    "Good night! Rest your mind and rejuvenate your spirit for a new day.",
-    "Wishing you a night so peaceful that even the moonlight pauses to admire.",
-    "Sweet dreams are made of starlight and whispers of the night.",
-    "May your sleep be deep, and your dreams be delightful.",
-    "Drift into the night, and let the magic of dreams unfold.",
-    "The night is a canvas, and your dreams are the masterpiece.",
-    "As you lay down to sleep, remember that tomorrow is a new canvas waiting for your brushstroke.",
-    "Close your eyes, take a deep breath, and let the night cradle you in its soothing embrace.",
-    "Wishing you a night filled with tranquility and the promise of a brighter tomorrow.",
-    "Dreams are the night's way of showing you a preview of the beauty that tomorrow holds.",
-    "Sleep peacefully, knowing that you are cherished and valued.",
-    "The night sky is a testament to the beauty that exists even in the darkness. Sweet dreams!",
-    "As the night unfolds, may your dreams be filled with joy, love, and all things good.",
-    "Embrace the quiet of the night as you drift into a world of dreams.",
-    "May your sleep be as peaceful as a moonlit lake.",
-    "Dreamland awaits with open arms, ready to transport you to magical realms.",
-    "Close your eyes, and let the night unfold its mysteries in your dreams.",
-    "As the stars twinkle above, may your dreams sparkle with joy.",
-    "Wishing you a night filled with the gentle whispers of the wind and the rustling of leaves.",
-    "Sleep like a baby, wrapped in the warmth of serenity and love.",
-    "May your dreams be a tapestry woven with threads of happiness and fulfillment.",
-    "Good night! Tomorrow is a blank page; tonight, rest well to write a beautiful story.",
-    "Let go of today's worries; tomorrow is a new chapter waiting to be written.",
-    "In the realm of dreams, may you find the answers to your heart's desires.",
-    "The night sky is a celestial dance; let your dreams join the cosmic ballet.",
-    "Drift into the night like a leaf carried by a gentle breeze, and let your dreams soar.",
-    "As the world sleeps, may your dreams be a symphony of peace and harmony.",
-    "Sleep with the knowledge that you are surrounded by love and positivity.",
-    "Good night! May your dreams be the stepping stones to a brighter and happier future.",
-    "Close your eyes, and let the moonlight guide you to a land of enchantment.",
-    "Wishing you a night filled with the soft melody of crickets and the rustling of leaves.",
-    "As the night deepens, may your dreams reach new heights of creativity and inspiration.",
-    "Sleep is the best meditation; may your night be a peaceful journey within.",
-    "Dreams are the stars of the night; may yours shine the brightest.",
-    "Good night! Tomorrow is a canvas; tonight, rest well to paint a masterpiece.",
-    "May the night wrap you in its comforting embrace, and your dreams be a source of joy.",
-    "Close your eyes and let the night unfold its tapestry of dreams just for you.",
-    "Wishing you a night filled with the magic of possibility and the promise of tomorrow.",
-    "May the moonlight be your guide as you journey into the realm of dreams.",
-    "As you sleep, may the night weave a blanket of peace around your soul.",
-    "Good night! Rest your body, recharge your spirit, and wake up ready to conquer the day.",
-    "May the night be a sanctuary where your mind finds solace and your dreams find wings.",
-    "Close your eyes, and let the night be a canvas for the most beautiful dreams to paint.",
-    "Wishing you a night filled with the sweet fragrance of dreams and the gentle touch of sleep."
-}
+# ═══════════════════════════════════════════════════════════════
+# UI DESIGN VARIABLES - Change all visual elements here
+# ═══════════════════════════════════════════════════════════════
 
-pickup_lines = {
-    "If you were a puzzle, you'd be the missing piece I've been searching for.",
-    "Are you a bookstore? Because every time I read you, I discover something new.",
-    "Is your name Espresso? Because you’re short, strong, and keep me up all night.",
-    "Do you have a name or can I call you mine? I promise I won't write it in my notebook... unless you want me to.",
-    "Are you a compass? Because I always find my direction when I'm with you.",
-    "If you were a song, you'd be the melody that never leaves my mind.",
-    "Are you a scientist? Because you just made my heart undergo a chemical reaction.",
-    "Do you have a sunburn, or are you always this electric?",
-    "Is your name Autumn? Because you've just fallen for me.",
-    "Are you a time traveler? Because I can see you in my future for a long time.",
-    "If you were a cookie, you'd be a 'fortune'-ate one.",
-    "Do you have a name, or can I call you mine? Because I'm claiming you as my happiness.",
-    "Are you a telescope? Because every time I look at you, my world expands.",
-    "If beauty were time, you'd be an everlasting moment.",
-    "Do you have a Band-Aid? Because I just hurt my knee falling... for you.",
-    "Is your name Atlas? Because you've shouldered your way into my heart.",
-    "Are you a garden? Because I'm digging you.",
-    "If you were a song, you'd be a symphony of perfection.",
-    "Do you have a sunburn, or are you always this fiery?",
-    "Is your name Cinderella? Because when you walked in, time stood still.",
-    "Are you a painter? Because you've colored my world with joy.",
-    "If you were a star, you'd be the constellation of my dreams.",
-    "Do you have a map? Because I just got lost in your eyes... again.",
-    "Is your name Winter? Because you make my heart feel ice-struck.",
-    "Are you a sculptor? Because you've crafted the masterpiece of my desires.",
-    "If you were a planet, you'd be the one I'd revolve around.",
-    "Do you have a name, or can I call you mine? Because I'm ready to start our story together.",
-    "Are you a magician? Because whenever I look at you, everyone else disappears.",
-    "Do you have a map? I keep getting lost in your eyes.",
-    "If you were a vegetable, you'd be a cute-cumber!",
-    "Are you a Wi-Fi signal? Because I'm feeling a connection.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Can I follow you home? Cause my parents always told me to follow my dreams.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Excuse me, but I think the stars tonight are outshone by your smile.",
-    "If you were a cat, you'd purr-fect.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Can I take you out for dinner? Because I can't seem to get you out of my mind.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Are you a time traveler? Because I can't imagine my future without you.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Can I borrow a map? I keep getting lost in your eyes.",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Are you a loan? Because you have my interest.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is this the Hogwarts Express? Because it feels like you and I are headed somewhere magical.",
-    "If beauty were time, you’d be an eternity.",
-    "Are you a time traveler? Because I can't seem to get you out of my future.",
-    "Is your name Wi-fi? Because I'm feeling a connection.",
-    "Do you have a pencil? Because I want to erase your past and write our future.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Is it hot in here, or is it just you?",
-    "If you were a cat, you’d purr-suade me to take you out.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Do you have a map? I keep getting lost in your eyes.",
-    "If you were words on a page, you’d be fine print.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Do you have a mirror in your pocket? Because I can see myself in your pants.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "If beauty were time, you'd be an eternity.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "Are you a loan? Because you have my interest.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is this the Hogwarts Express? Because it feels like you and I are headed somewhere magical.",
-    "If beauty were time, you’d be an eternity.",
-    "Are you a time traveler? Because I can't seem to get you out of my future.",
-    "Is your name Wi-fi? Because I'm feeling a connection.",
-    "Do you have a pencil? Because I want to erase your past and write our future.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Is it hot in here, or is it just you?",
-    "If you were a cat, you’d purr-suade me to take you out.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Do you have a map? I keep getting lost in your eyes.",
-    "If you were words on a page, you’d be fine print.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Do you have a mirror in your pocket? Because I can see myself in your pants.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "If beauty were time, you'd be an eternity.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "If you were a vegetable, you'd be a cute-cumber!",
-    "Are you a Wi-Fi signal? Because I'm feeling a connection.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Can I follow you home? Cause my parents always told me to follow my dreams.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Excuse me, but I think the stars tonight are outshone by your smile.",
-    "If you were a cat, you'd purr-fect.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Can I take you out for dinner? Because I can't seem to get you out of my mind.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Are you a time traveler? Because I can't imagine my future without you.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Can I borrow a map? I keep getting lost in your eyes.",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is this the Hogwarts Express? Because it feels like you and I are headed somewhere magical.",
-    "If beauty were time, you’d be an eternity.",
-    "Are you a time traveler? Because I can't seem to get you out of my future.",
-    "Is your name Wi-fi? Because I'm feeling a connection.",
-    "Do you have a pencil? Because I want to erase your past and write our future.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Is it hot in here, or is it just you?",
-    "If you were a cat, you’d purr-suade me to take you out.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Do you have a map? I keep getting lost in your eyes.",
-    "If you were words on a page, you’d be fine print.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Do you have a mirror in your pocket? Because I can see myself in your pants.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "If beauty were time, you'd be an eternity.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "If you were a vegetable, you'd be a cute-cumber!",
-    "Are you a Wi-Fi signal? Because I'm feeling a connection.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Can I follow you home? Cause my parents always told me to follow my dreams.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Excuse me, but the stars tonight are outshone by your smile.",
-    "If you were a cat, you'd purr-fect.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Can I take you out for dinner? Because I can't seem to get you out of my mind.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Are you a time traveler? Because I can't imagine my future without you.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Can I borrow a map? I keep getting lost in your eyes.",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is this the Hogwarts Express? Because it feels like you and I are headed somewhere magical.",
-    "If beauty were time, you’d be an eternity.",
-    "Are you a time traveler? Because I can't seem to get you out of my future.",
-    "Is your name Wi-fi? Because I'm feeling a connection.",
-    "Do you have a pencil? Because I want to erase your past and write our future.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Is it hot in here, or is it just you?",
-    "If you were a cat, you’d purr-suade me to take you out.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Do you have a map? I keep getting lost in your eyes.",
-    "If you were words on a page, you’d be fine print.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Do you have a mirror in your pocket? Because I can see myself in your pants.",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "If beauty were time, you'd be an eternity.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "If you were a vegetable, you'd be a cute-cumber!",
-    "Are you a Wi-Fi signal? Because I'm feeling a connection.",
-    "Do you have a sunburn, or are you always this hot?",
-    "Can I follow you home? Cause my parents always told me to follow my dreams.",
-    "Are you a camera? Every time I look at you, I smile.",
-    "Are you made of copper and tellurium? Because you're Cu-Te.",
-    "Excuse me, but the stars tonight are outshone by your smile.",
-    "If you were a cat, you'd purr-fect.",
-    "Do you believe in love at first sight, or should I walk by again?",
-    "Excuse me, but I think you dropped something: MY JAW!",
-    "Can I take you out for dinner? Because I can't seem to get you out of my mind.",
-    "Are you a parking ticket? Because you've got 'FINE' written all over you.",
-    "Are you a time traveler? Because I can't imagine my future without you.",
-    "Do you have a Band-Aid? Because I just scraped my knee falling for you.",
-    "Is your name Google? Because you've got everything I've been searching for.",
-    "Can I borrow a map? I keep getting lost in your eyes.",
-    "Are you a campfire? Because you're hot, and I want s'more.",
-    "Excuse me, but I think you dropped something: MY JAW!"
-}
+# Box characters
+BOX_TOP = "━━━━━━━━━━━━━━━━━━━━"
+BOX_SIDE = " "
+BOX_CORNER_TL = "┏"
+BOX_CORNER_TR = "┓"
+BOX_CORNER_BL = "┗"
+BOX_CORNER_BR = "┛"
+
+# Separators
+SEPARATOR_LIGHT = "─────────────────────"
+SEPARATOR_HEAVY = "━━━━━━━━━━━━━━━━━━━━"
+
+# Progress bar characters
+PROGRESS_FILL = "█"
+PROGRESS_EMPTY = "░"
+
+# Status icons
+ICON_COMPLETE = "✓"
+ICON_INCOMPLETE = "○"
+ICON_PARTIAL = "◐"
+ICON_MISSED = "⭘"
+ICON_FUTURE = "·"
+ICON_STREAK = "🔥"
+ICON_TROPHY = "🏆"
+
+# Calendar symbols
+CAL_COMPLETE = "●"
+CAL_PARTIAL = "◐"
+CAL_INCOMPLETE = "○"
+CAL_MISSED = "×"
+CAL_FUTURE = "·"
+
+# Spacing character (zero-width space doesn't work, use thin space)
+SP = "\u2009"  # Thin space that Telegram respects
+
+# Helper functions for UI
+def make_header(text):
+    """Create centered header box"""
+    padding = (20 - len(text)) // 2
+    padded_text = " " * padding + text + " " * (20 - len(text) - padding)
+    return f"{BOX_CORNER_TL}{BOX_TOP}{BOX_CORNER_TR}\n{BOX_SIDE}*             {padded_text}*{BOX_SIDE}\n{BOX_CORNER_BL}{BOX_TOP}{BOX_CORNER_BR}\n"
+
+def make_progress_bar(percentage, length=20):
+    """Create progress bar"""
+    filled = int((percentage / 100) * length)
+    return PROGRESS_FILL * filled + PROGRESS_EMPTY * (length - filled)
+
+def make_streak_bar(streak, max_icons=10):
+    """Create streak visualization"""
+    display_count = min(streak, max_icons)
+    return ICON_STREAK * display_count
+
+# ═══════════════════════════════════════════════════════════════
+# END UI DESIGN VARIABLES
+# ═══════════════════════════════════════════════════════════════
+
+# Global storage
+routines_dict: dict[int, MorningRoutine] = {}
+FILE_NAME = './routines_data.json'
+
+# Customizable quick replies for watches
+DEFAULT_REPLIES = ["Done", "Next", "Complete", "Ok", "Great"]
+user_replies: dict[int, list[str]] = {}  # chat_id -> list of replies
 
 @dp.message(Command("start", "restart"))
 async def cmd_start(message: types.Message, state: FSMContext) -> None:
-    global task_dictionary, message_id
-    chat_id = message.from_user.id 
-    message_id = message.message_id
-    CONSOLE = f'''\n 
-                        CONSOLE: start\n
-                        STATE: Menu\n
-                        CHAT_ID: {chat_id}\n
-               '''
-    print(CONSOLE)
-    if chat_id not in task_dictionary.keys():
-        task_dictionary[chat_id] = ToDoList(chat_id) 
-    await state.set_state(StepsForm.MENU)
-    task_dictionary[chat_id].check(datetime.datetime.now())
-
-    markup = custom_markup_for_the_menu()
-
-    await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-@dp.message(F.text.strip() == 'Rizz')
-async def toggle_rizz(message: types.Message):
     chat_id = message.from_user.id
-    if chat_id in task_dictionary:
-        task_dictionary[chat_id].rizz_enabled = not task_dictionary[chat_id].rizz_enabled
-        status = "enabled" if task_dictionary[chat_id].rizz_enabled else "disabled"
-        await bot.send_message(chat_id, f"Rizz feature is now {status}.", disable_notification=True)
+    
+    print(f"\n=== START command from {chat_id} ===\n")
+    
+    # Initialize routine if new user
+    if chat_id not in routines_dict:
+        routines_dict[chat_id] = MorningRoutine(chat_id)
+        user_replies[chat_id] = DEFAULT_REPLIES.copy()
+        await state.set_state(StepsForm.SETUP_INTRO)
+        
+        intro_text = make_header("MORNING ROUTINE") + """
+Build consistent habits
+Track your progress
 
-@dp.message(F.text.strip() == 'DEACTIVATE')
-async def deactivate_account(message: types.Message, state: FSMContext) -> None: 
+Ready to begin?
+"""
+        
+        markup = ReplyKeyboardMarkup(
+            resize_keyboard=True,
+            keyboard=[[KeyboardButton(text="Start")]],
+            one_time_keyboard=True
+        )
+        
+        await bot.send_message(chat_id, intro_text, reply_markup=markup)
+    else:
+        # Existing user - go to menu
+        await show_main_menu(chat_id, state)
 
-    if await state.get_state() == StepsForm.MENU:        
-        chat_id = message.from_user.id
-        CONSOLE = f'''\n 
-                        CONSOLE: !DEACTIVATE! account\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
+@dp.message(StepsForm.SETUP_INTRO, F.text == "Start")
+async def setup_start(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    await state.set_state(StepsForm.SETUP_ADD_TASK)
+    
+    text = make_header("ADD TASKS") + """
+    *Format:*
+    `task` `minutes`
+
+    *Examples:*
+    `Wake up 2`
+    `Exercise 15`
+    `Breakfast 30`
+
+    *Optional task:*
+    `Shower 10 optional`
+
+    Send your first task:
+    """
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[[KeyboardButton(text="Wake up 2")]],
+        one_time_keyboard=False
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+@dp.message(StepsForm.SETUP_ADD_TASK)
+async def setup_add_task_or_finish(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    # Handle finish setup
+    if text == "Finish":
+        if len(routine.tasks) == 0:
+            await bot.send_message(chat_id, "`Add at least one task`")
+            return
+        
+        routine.is_setup_complete = True
+        save_routines()
+        
+        await show_main_menu(chat_id, state)
+        
+        await bot.send_message(
+            chat_id,
+            "*Setup complete*\n\nStart your routine between `05:00 \\- 11:00`"
+        )
+        return
+    
+    # Handle add another task
+    if text == "+ Add":
+        await bot.send_message(
+            chat_id,
+            "Send next task:\n`task name` `minutes`"
+        )
+        return
+    
+    # Handle adding a task
+    try:
+        parts = text.strip().split()
+        
+        # Check if last part is "optional"
+        optional = False
+        if parts[-1].lower() == "optional":
+            optional = True
+            parts = parts[:-1]
+        
+        # Last part should be duration
+        duration = int(parts[-1])
+        task_name = " ".join(parts[:-1])
+        
+        if routine.add_task(task_name, duration, optional):
+            current_tasks = routine.get_status_display()
             
-        markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=[[KeyboardButton(text='/start')]], one_time_keyboard=False)
-        del task_dictionary[chat_id]
-        
-        await bot.send_message(chat_id, "<code> Sir, your account, OH NOO, SIR\n\n IT's successfully gone</code>", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-@dp.message(F.text.strip() == 'Back')
-async def back_state_activity(message: types.Message, state: FSMContext) -> None: 
-    if await state.get_state() in (StepsForm.WORKING_ADD, StepsForm.WORKING_DELETE, StepsForm.WORKING_START):
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.WORKING)
-
-        markup = custom_markup_for_working()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        
-        CONSOLE = f'''\n 
-                        CONSOLE: Working\n
-                        STATE: Working\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-    elif await state.get_state() in (StepsForm.TEMPLATE_DELETE, StepsForm.TEMPLATE_ADD):
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.TEMPLATE)
-
-        markup = custom_markup_for_template()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nWhat do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        
-        CONSOLE = f'''\n 
-                        CONSOLE: Menu\n
-                        STATE: Menu\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-
-@dp.message(F.text.strip() == 'Menu')
-async def menu_activity(message: types.Message, state: FSMContext) -> None: 
-    if await state.get_state() != StepsForm.MENU:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.MENU)
-        
-        markup = custom_markup_for_the_menu()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: Menu\n
-                        STATE: Menu\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        
-@dp.message(F.text.strip() == 'Working')
-async def working_activity(message: types.Message, state: FSMContext) -> None:  
+            opt_label = " `opt`" if optional else ""
+            response_text = f"✓ *Added:* {task_name} `{duration}m`{opt_label}\n\n{SEPARATOR_HEAVY}\n\n{current_tasks}"
+            
+            markup = ReplyKeyboardMarkup(
+                resize_keyboard=True,
+                keyboard=[
+                    [KeyboardButton(text="+ Add")],
+                    [KeyboardButton(text="Finish")]
+                ],
+                one_time_keyboard=False
+            )
+            
+            await bot.send_message(chat_id, response_text, reply_markup=markup)
+        else:
+            await bot.send_message(chat_id, "`Max 15 tasks\\. Finish setup\\.`")
     
-    if await state.get_state() == StepsForm.MENU:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.WORKING)
+    except (ValueError, IndexError):
+        await bot.send_message(
+            chat_id, 
+            "`Invalid format`\nUse: `task name` `minutes`"
+        )
 
-        markup = custom_markup_for_working()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        
-        CONSOLE = f'''\n 
-                        CONSOLE: Working\n
-                        STATE: Working\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
 
-@dp.message(F.text.strip() == 'Template')
-async def template_activity(message: types.Message, state: FSMContext) -> None:  
+async def show_main_menu(chat_id: int, state: FSMContext):
+    await state.set_state(StepsForm.MENU)
+    routine = routines_dict[chat_id]
     
-    if await state.get_state() == StepsForm.MENU:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.TEMPLATE)
-
-        markup = custom_markup_for_template()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nWhat do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        
-        CONSOLE = f'''\n 
-                        CONSOLE: Menu\n
-                        STATE: Menu\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
-
-@dp.message(F.text.strip() == 'Start/Stop')
-async def working_start_activity(message: types.Message, state: FSMContext) -> None:  
-    if await state.get_state() == StepsForm.WORKING:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.WORKING_START)
-        
-
-        markup = custom_markup_for_working_start_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nStart/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        CONSOLE = f'''\n 
-                        CONSOLE: Working START/STOP\n
-                        STATE: Working start\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
-
-@dp.message(F.text.strip() == 'Add')
-async def add_activity(message: types.Message, state: FSMContext) -> None: 
+    status = routine.get_status_display()
     
-    if await state.get_state() == StepsForm.WORKING:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.WORKING_ADD)
-
-        markup = custom_markup_for_working_add_activity()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nAdd:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: WORKING ADD\n
-                        STATE: working add\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
+    buttons = []
     
-    if await state.get_state() == StepsForm.TEMPLATE:
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.TEMPLATE_ADD)
-
-        markup = custom_markup_for_template_add_activity()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nAdd:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: TEMPLATE ADD\n
-                        STATE: template add\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
-
-@dp.message(F.text.strip() == 'Delete')
-async def delete_activity(message: types.Message, state: FSMContext) -> None: 
+    if routine.can_start_routine() and not routine.routine_started:
+        buttons.append([KeyboardButton(text="Start Routine")])
+    elif routine.routine_started:
+        buttons.append([KeyboardButton(text="Continue")])
     
-    if await state.get_state() == StepsForm.WORKING: 
-        
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.WORKING_DELETE)
-
-        markup = custom_markup_for_working_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Working:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: WORKING DELETE\n
-                        STATE: working delete\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        
-    if await state.get_state() == StepsForm.TEMPLATE: 
-        
-        chat_id = message.from_user.id
-        await state.set_state(StepsForm.TEMPLATE_DELETE)
-
-        markup = custom_markup_for_template_delete_activity(task_dictionary, chat_id)
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: TEMPLATE DELETE\n
-                        STATE: template delete\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-
-
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
-
-@dp.message(F.text.strip() == 'Replace current tasks with template')
-async def current_task_to_template(message: types.Message, state: FSMContext) -> None:  
-    global task_dictionary
+    buttons.extend([
+        [KeyboardButton(text="Stats"), KeyboardButton(text="Settings")]
+    ])
     
-    if await state.get_state() == StepsForm.TEMPLATE:
-        chat_id = message.from_user.id
-        
-        markup = custom_markup_for_template()
-
-        task_dictionary[chat_id].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks_template]
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nWhat do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: replace current tasks with template\n
-                        STATE: template\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-
-    else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
-
-@dp.message(F.text.strip() == 'Replace template with current tasks')
-async def template_to_current_task(message: types.Message, state: FSMContext) -> None:  
-    global task_dictionary
+    markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
     
-    if await state.get_state() == StepsForm.TEMPLATE:
-        chat_id = message.from_user.id
-        
-        markup = custom_markup_for_template()
+    await bot.send_message(chat_id, status, reply_markup=markup)
 
-        task_dictionary[chat_id].tasks_template = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_id].tasks if task.remaining_time >= 0]
-        for task in task_dictionary[chat_id].tasks_template:
-            task.going = False
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + "Template:\nWhat do you want to do within a template, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        CONSOLE = f'''\n 
-                        CONSOLE: template with current tasks\n
-                        STATE: template\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
+@dp.message(StepsForm.MENU, F.text == "Start Routine")
+async def start_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    if not routine.can_start_routine():
+        now = datetime.datetime.now()
+        await bot.send_message(
+            chat_id,
+            f"`Routine window: 05:00 \\- 11:00`\n`Now: {now.strftime('%H:%M')}`"
+        )
+        return
+    
+    if routine.start_routine():
+        await state.set_state(StepsForm.ROUTINE_ACTIVE)
+        save_routines()
         
+        # Send first task automatically
+        await send_next_task(chat_id, state)
     else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
+        await bot.send_message(chat_id, "`Could not start routine`")
 
-@dp.message(F.text.strip() != 'Delete' and F.text.strip() != 'Start/Stop' and F.text.strip() != 'Add')
-async def handle_activity(message: types.Message, state: FSMContext) -> None:
-    global task_dictionary
-    if await state.get_state() == StepsForm.WORKING_START:
-        
-        chat_id = message.from_user.id
-        
-        CONSOLE = f'''\n 
-                        CONSOLE: WORKING_START\n
-                        STATE: WORKING_START\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        
-        try:
-            task_to_start_or_stop_from_user_splitted = message.text
 
-            if task_dictionary[chat_id].start_activity(task_to_start_or_stop_from_user_splitted, date_time=message.date):
+@dp.message(StepsForm.MENU, F.text == "Continue")
+async def continue_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    await state.set_state(StepsForm.ROUTINE_ACTIVE)
+    await send_next_task(chat_id, state)
+
+
+async def send_next_task(chat_id: int, state: FSMContext):
+    """Send next uncompleted task - watch-friendly"""
+    routine = routines_dict[chat_id]
+    
+    # Find next uncompleted task
+    next_task = None
+    task_num = None
+    for i, task in enumerate(routine.tasks):
+        if not task.completed:
+            next_task = task
+            task_num = i + 1
+            break
+    
+    if next_task:
+        await state.set_state(StepsForm.ROUTINE_ACTIVE_WAITING)
+        
+        # Count remaining
+        remaining = sum(1 for t in routine.tasks if not t.completed)
+        completion = routine.get_completion_percentage()
+        
+        opt_label = " `opt`" if next_task.optional else ""
+        
+        # Progress bar
+        total_tasks = len([t for t in routine.tasks if not t.optional])
+        completed_tasks = total_tasks - remaining
+        progress_bar = make_progress_bar((completed_tasks / total_tasks) * 100, 20)
+        
+        text = make_header(f"TASK {task_num}") + f"""
+*{next_task.name}*
+`{next_task.duration} minutes`{opt_label}
+
+{progress_bar}
+`{completion:.0f}%` · `{remaining} left`
+"""
+        
+        # Create quick reply buttons
+        replies = user_replies.get(chat_id, DEFAULT_REPLIES)
+        buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
+        buttons.append([KeyboardButton(text="Skip"), KeyboardButton(text="Menu")])
+        
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
+        
+        await bot.send_message(chat_id, text, reply_markup=markup, disable_notification=True)
+    else:
+        # All tasks done
+        await finish_routine_confirmed(chat_id, state)
+
+@dp.message(StepsForm.ROUTINE_ACTIVE_WAITING)
+async def handle_task_response(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text == "Menu":
+        await show_main_menu(chat_id, state)
+        return
+    
+    if text == "Skip":
+        # Just move to next task without marking complete
+        await send_next_task(chat_id, state)
+        return
+    
+    # Any other response = task completed
+    # Find current uncompleted task
+    for i, task in enumerate(routine.tasks):
+        if not task.completed:
+            routine.complete_task(i)
+            save_routines()
+            break
+    
+    # Send next task
+    await send_next_task(chat_id, state)
+
+
+# Keep the old handler for direct access
+@dp.message(StepsForm.ROUTINE_ACTIVE)
+async def handle_routine_action(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    text = message.text.strip()
+    
+    if text == "Menu":
+        await show_main_menu(chat_id, state)
+    else:
+        await send_next_task(chat_id, state)
+
+
+async def finish_routine_confirmed(chat_id: int, state: FSMContext):
+    routine = routines_dict[chat_id]
+    routine.finish_routine()
+    save_routines()
+    
+    completion = routine.get_completion_percentage()
+    
+    if completion >= 80:
+        progress_bar = make_progress_bar(completion, 20)
+        streak_bar = make_streak_bar(routine.current_streak, 10)
+        
+        duration = routine.history[datetime.date.today().isoformat()]['duration']
+        
+        message = make_header("✓ COMPLETE") + f"""
+{progress_bar}
+`{completion:.0f}%`
+
+{streak_bar}
+*{routine.current_streak} day streak*
+
+Duration: `{duration} min`
+
+_{get_encouragement_message(routine.current_streak)}_
+"""
+    else:
+        message = make_header("FINISHED") + f"""
+`{completion:.0f}% complete`
+
+Streak reset
+Tomorrow is a fresh start
+"""
+    
+    await show_main_menu(chat_id, state)
+    await bot.send_message(chat_id, message)
+
+def get_encouragement_message(streak: int) -> str:
+    """Return encouraging message based on streak"""
+    if streak == 1:
+        return "Day one"
+    elif streak == 3:
+        return "Momentum building"
+    elif streak == 7:
+        return "One week"
+    elif streak == 14:
+        return "Two weeks strong"
+    elif streak == 30:
+        return "One month"
+    elif streak == 60:
+        return "Two months"
+    elif streak == 90:
+        return "Three months"
+    else:
+        return "Keep going"
+    
+@dp.message(StepsForm.MENU, F.text == "Stats")
+async def view_stats(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.STATS_VIEW)
+    
+    stats = routine.get_weekly_stats()
+    visual = create_week_visual(routine)
+    
+    weekly_bar = make_progress_bar((stats['completed_days'] / 7) * 100, 20)
+    
+    stats_text = make_header("STATISTICS") + f"""
+*Last 7 Days*
+{visual}
+
+`{stats['completed_days']}/7` · `{stats['avg_completion']:.0f}%`
+{weekly_bar}
+
+{SEPARATOR_LIGHT}
+
+*Streaks*
+Current:  `{stats['current_streak']}d` {ICON_STREAK}
+Best:       `{stats['best_streak']}d` {ICON_TROPHY}
+Total:      `{stats['total_completions']}`
+
+_{get_weekly_insights(stats)}_
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Month"), KeyboardButton(text="Menu")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, stats_text, reply_markup=markup)
+
+def create_week_visual(routine: MorningRoutine) -> str:
+    """Create visual representation of last 7 days"""
+    emojis = []
+    labels = []
+    
+    for i in range(6, -1, -1):
+        date = (datetime.date.today() - datetime.timedelta(days=i)).isoformat()
+        day_data = routine.history.get(date, {'completion': 0})
+        
+        completion = day_data.get('completion', 0)
+        if day_data.get('missed', False):
+            emoji = CAL_MISSED + ' '
+        elif completion >= 80:
+            emoji = CAL_COMPLETE + ' '
+        elif completion > 0:
+            emoji = CAL_PARTIAL + ' '
+        else:
+            emoji = CAL_INCOMPLETE + ' '
+        
+        day_name = (datetime.date.today() - datetime.timedelta(days=i)).strftime('%a')[:2].upper()
+        labels.append(day_name)
+        emojis.append(emoji)
+    
+    # Use code block for perfect alignment
+    label_line = " ".join(labels)
+    emoji_line = " ".join(emojis)
+    
+    return f"```\n{label_line}\n{emoji_line}\n```"
+
+def get_weekly_insights(stats: dict) -> str:
+    """Generate personalized insights"""
+    completed = stats['completed_days']
+    
+    if completed == 7:
+        return "`Perfect week`"
+    elif completed >= 5:
+        return "`Strong consistency`"
+    elif completed >= 3:
+        return "`Building habit`"
+    elif completed >= 1:
+        return "`Keep building`"
+    else:
+        return "`Fresh start`"
+
+
+@dp.message(StepsForm.STATS_VIEW, F.text == "Month")
+async def monthly_view(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    month_visual = create_month_visual(routine)
+    month_stats = get_month_stats(routine)
+    
+    month_name = datetime.date.today().strftime('%B %Y').upper()
+    
+    text = make_header(month_name) + f"""
+{month_visual}
+
+{month_stats}
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[[KeyboardButton(text="Back")]]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+def create_month_visual(routine: MorningRoutine) -> str:
+    """Create calendar-style month view with proper alignment"""
+    today = datetime.date.today()
+    first_day = today.replace(day=1)
+    
+    # Calculate last day of month
+    if today.month == 12:
+        last_day = today.replace(year=today.year + 1, month=1, day=1) - datetime.timedelta(days=1)
+    else:
+        last_day = today.replace(month=today.month + 1, day=1) - datetime.timedelta(days=1)
+    
+    lines = []
+    
+    # Header with day labels in monospace (each label is 2 chars)
+    lines.append("`Mo Tu We Th Fr Sa Su`\n")
+    
+    # Start from Monday of the week containing first day
+    current = first_day - datetime.timedelta(days=first_day.weekday())
+    week_emojis = []
+    
+    while current <= last_day:
+        if current.month == today.month:
+            if current <= today:
+                day_data = routine.history.get(current.isoformat(), {})
+                completion = day_data.get('completion', 0)
                 
-                markup = custom_markup_for_working_start_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-                task_dictionary[chat_id].check(datetime.datetime.now())
-
-                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully started or stopped \n' +  "Working:\nStart/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                if day_data.get('missed', False):
+                    emoji = f"`{CAL_MISSED} `"
+                elif completion >= 80:
+                    emoji = f"`{CAL_COMPLETE} `"
+                elif completion > 0:
+                    emoji = f"`{CAL_PARTIAL} `"
+                else:
+                    emoji = f"`{CAL_INCOMPLETE} `"
             else:
-
-                markup = custom_markup_for_working_start_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-                task_dictionary[chat_id].check(datetime.datetime.now())
-
-                await bot.send_message(chat_id, 'Task was not touched \n\n' +  "Working:\nStart/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        except Exception as e:
-            print(e)
-
-            await bot.send_message(chat_id, 'Task was not touched \n' +  "Working:\nStart/Stop:\nWhat task do you want to start or stop, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-    elif await state.get_state() == StepsForm.WORKING_ADD:
-        chat_id = message.from_user.id
-        CONSOLE = f'''\n 
-                        CONSOLE: WORKING ADD\n
-                        STATE: working add\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-
-
-        markup = custom_markup_for_working_add_activity()
+                emoji = f"`{CAL_FUTURE} `"  # Future days
+        else:
+            emoji = "`\u2009\u2009`"  # Empty slot = 3 thin spaces to match "Mo "
         
+        week_emojis.append(emoji)
+        
+        if len(week_emojis) == 7:
+            # Each emoji + 3 spaces to match 2-char day label + space
+            lines.append("\u2009\u2009\u2009".join(week_emojis) + "\n")
+            week_emojis = []
+        
+        current += datetime.timedelta(days=1)
+    
+    # Add remaining days if any
+    if week_emojis:
+        while len(week_emojis) < 7:
+            week_emojis.append("\u2009\u2009\u2009")
+        lines.append("\u2009\u2009\u2009".join(week_emojis) + "\n")
+    
+    return "".join(lines)
+
+def get_month_stats(routine: MorningRoutine) -> str:
+    """Calculate current month statistics"""
+    today = datetime.date.today()
+    first_day = today.replace(day=1)
+    
+    completed = 0
+    total_days = 0
+    
+    current = first_day
+    while current <= today:
+        total_days += 1
+        day_data = routine.history.get(current.isoformat(), {})
+        if day_data.get('completion', 0) >= 80:
+            completed += 1
+        current += datetime.timedelta(days=1)
+    
+    rate = (completed / total_days * 100) if total_days > 0 else 0
+    month_bar = make_progress_bar(rate, 20)
+    
+    return f"""`{completed}/{total_days}` · `{rate:.0f}%`
+{month_bar}
+
+{SEPARATOR_LIGHT}
+
+*Legend*
+{CAL_COMPLETE} Done  {CAL_PARTIAL} Partial  {CAL_INCOMPLETE} Missed"""
+
+@dp.message(StepsForm.STATS_VIEW, F.text == "Back")
+async def back_to_stats(message: types.Message, state: FSMContext):
+    await view_stats(message, state)
+
+
+@dp.message(StepsForm.STATS_VIEW, F.text == "Menu")
+async def stats_to_menu(message: types.Message, state: FSMContext):
+    await show_main_menu(message.from_user.id, state)
+
+@dp.message(StepsForm.MENU, F.text == "Settings")
+async def show_settings(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    await state.set_state(StepsForm.SETTINGS)
+    
+    text = make_header("SETTINGS") + """
+Configure your routine
+Customize experience
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Edit Routine")],
+            [KeyboardButton(text="Quick Replies")],
+            [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
+            [KeyboardButton(text="Menu")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+@dp.message(StepsForm.SETTINGS, F.text == "Edit Routine")
+async def edit_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_ROUTINE)
+    
+    tasks_list = "\n".join([
+        f"`{i+1}.` {t.name} `{t.duration}m`{' `opt`' if t.optional else ''}"
+        for i, t in enumerate(routine.tasks)
+    ])
+    
+    text = make_header("EDIT ROUTINE") + f"""
+*Your Tasks:*
+{tasks_list}
+
+{SEPARATOR_LIGHT}
+
+*Commands:*
+Type number to remove
+`add task duration`
+`add task duration optional`
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[[KeyboardButton(text="Back")]]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
+async def handle_edit_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text == "Back":
+        await show_settings(message, state)
+        return
+    
+    # Remove task
+    if text.isdigit():
+        task_num = int(text) - 1
+        if routine.remove_task(task_num):
+            save_routines()
+            await bot.send_message(chat_id, "`Removed`")
+            await edit_routine(message, state)
+        else:
+            await bot.send_message(chat_id, "`Invalid number`")
+    
+    # Add task
+    elif text.lower().startswith("add "):
         try:
-
-            task_from_user_splitted = message.text.split()
-            task_from_user = (' '.join(task_from_user_splitted[:-1]), task_from_user_splitted[-1])
-            name_of_task, duration = task_from_user
-            duration = int(duration)
-            if (task_dictionary[chat_id].append(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks() <= 30):
-                task_dictionary[chat_id].check(datetime.datetime.now())
-
-                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully added \n' +  "Working:\nAdd:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+            parts = text[4:].strip().split()
+            optional = parts[-1].lower() == "optional"
+            if optional:
+                parts = parts[:-1]
+            
+            duration = int(parts[-1])
+            task_name = " ".join(parts[:-1])
+            
+            if routine.add_task(task_name, duration, optional):
+                save_routines()
+                await bot.send_message(chat_id, f"`Added: {task_name}`")
+                await edit_routine(message, state)
             else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].__str__() + '\n\n\n' + 'Working:\nAdd:\nTask with the same name exists or you achieved limit\n' +  "Task's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        except Exception as e:
-            print(e)
-            await bot.send_message(chat_id, "Task was not added\n\nWorking:\nAdd:\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-    elif await state.get_state() == StepsForm.WORKING_DELETE:
-        chat_id = message.from_user.id
-        CONSOLE = f'''\n 
-                        CONSOLE: WORKING DELETE\n
-                        STATE: working delete\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        
-        
-        markup = custom_markup_for_working_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-
-        try:
-            task_to_delete_from_user_splitted = message.text
-            print()
-            print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-            if task_dictionary[chat_id].delete_task(task_to_delete_from_user_splitted):
-                print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-                print()
-                markup = custom_markup_for_working_delete_activity(task_dictionary=task_dictionary, chat_id=chat_id)
-                task_dictionary[chat_id].check(datetime.datetime.now())
-                await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + 'Successfully deleted \n' +  "Working:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-            else:
-                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "Working:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        except Exception as e:
-            print(e)
-            await bot.send_message(chat_id, 'Task was not deleted \n' +  "Working:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-    elif await state.get_state() == StepsForm.TEMPLATE_ADD:
-        chat_id = message.from_user.id
-        CONSOLE = f'''\n 
-                        CONSOLE: TEMPLATE ADD\n
-                        STATE: template add\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        markup = custom_markup_for_template_add_activity()
-        
-        try:
-            task_from_user_splitted = message.text.split()
-            task_from_user = (' '.join(task_from_user_splitted[:-1]), task_from_user_splitted[-1])
-            name_of_task, duration = task_from_user
-            duration = int(duration)
-            print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-            if (task_dictionary[chat_id].append_to_template(Task(name=name_of_task, duration=duration))) and (task_dictionary[chat_id].len_tasks_template() <= 30):
-                print(list(map(lambda x: x.name, task_dictionary[chat_id].tasks)))
-                task_dictionary[chat_id].check(datetime.datetime.now())
-                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully added \n' +  "Template:\nAdd:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-            else:
-                await bot.send_message(chat_id,  task_dictionary[chat_id].print_template() + '\n\n\n' + 'Task with the same name exists or you achieved limit\n' +  "Template:\nAdd:\nTask's name and duration in minutes, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-
-        except Exception as e:
-            print(e)
-            await bot.send_message(chat_id, "Task was not added\n\nTemplate:\nAdd:\nTask's name and duration in minutes, sweetie?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-    elif await state.get_state() == StepsForm.TEMPLATE_DELETE:
-        chat_id = message.from_user.id
-        CONSOLE = f'''\n 
-                        CONSOLE: TEMPLATE DELETE\n
-                        STATE: template delete\n
-                        CHAT_ID: {chat_id}\n
-               '''
-        print(CONSOLE)
-        
-        markup = custom_markup_for_template_delete_activity(task_dictionary, chat_id)
-
-        try:
-            task_to_delete_from_user_splitted = message.text
-
-            if task_dictionary[chat_id].delete_task_from_template(task_to_delete_from_user_splitted):
-                markup = custom_markup_for_template_delete_activity(task_dictionary, chat_id)
-
-                await bot.send_message(chat_id, task_dictionary[chat_id].print_template() + '\n\n\n' + 'Successfully deleted \n' +  "Template:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-            else:
-                await bot.send_message(chat_id, 'Task was not deleted \n\n' +  "Template:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
-        except Exception as e:
-            print(e)
-            await bot.send_message(chat_id, 'Task was not deleted \n' +  "Template:\nDelete:\nWhat task do you want to delete, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+                await bot.send_message(chat_id, "`Max 15 tasks`")
+        except (ValueError, IndexError):
+            await bot.send_message(chat_id, "`Invalid format`")
     else:
-        await if_your_state_is_initial_redirect_to_the_menu(state, message.from_user.id)
+        await bot.send_message(chat_id, "`Invalid command`")
 
-    save_dict_to_json(data=task_dictionary, json_file=FILE_NAME)
+@dp.message(StepsForm.SETTINGS, F.text == "Quick Replies")
+async def customize_replies(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    await state.set_state(StepsForm.SETTINGS_CUSTOMIZE_REPLIES)
+    
+    current = user_replies.get(chat_id, DEFAULT_REPLIES)
+    
+    text = make_header("QUICK REPLIES") + f"""
+Customize watch responses
 
-async def if_your_state_is_initial_redirect_to_the_menu(state: FSMContext, chat_id: int) -> None:
-    if await state.get_state() not in ( StepsForm.MENU, 
-                                        StepsForm.TEMPLATE,
-                                        StepsForm.TEMPLATE_ADD,
-                                        StepsForm.TEMPLATE_DELETE,
-                                        StepsForm.WORKING,
-                                        StepsForm.WORKING_START, 
-                                        StepsForm.WORKING_ADD, 
-                                        StepsForm.WORKING_DELETE):
-        
-        await state.set_state(StepsForm.MENU)
-        
-        markup = custom_markup_for_the_menu()
-        task_dictionary[chat_id].check(datetime.datetime.now())
-        await bot.send_message(chat_id, task_dictionary[chat_id].__str__() + '\n\n\n' + "Menu: \nWhat do you want to do, sir?", reply_markup=markup, parse_mode='HTML', disable_notification=True)
+*Current:*
+`{', '.join(current)}`
+
+*Format:*
+3-5 short words, comma separated
+
+*Example:*
+`Done, Next, Ok`
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Done, Next, Great")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+@dp.message(StepsForm.SETTINGS_CUSTOMIZE_REPLIES)
+async def handle_customize_replies(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    text = message.text.strip()
+    
+    if text == "Back":
+        await show_settings(message, state)
+        return
+    
+    # Parse comma-separated replies
+    replies = [r.strip() for r in text.split(',') if r.strip()]
+    
+    if 3 <= len(replies) <= 5:
+        user_replies[chat_id] = replies
+        save_routines()
+        await bot.send_message(chat_id, f"`Updated: {', '.join(replies)}`")
+        await show_settings(message, state)
+    else:
+        await bot.send_message(chat_id, "`Send 3\\-5 words separated by commas`")
+
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
+async def handle_edit_routine(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text == "Back":
+        await show_settings(message, state)
+        return
+    
+    # Remove task
+    if text.isdigit():
+        task_num = int(text) - 1
+        if routine.remove_task(task_num):
+            save_routines()
+            await bot.send_message(chat_id, "`Removed`")
+            await edit_routine(message, state)
+        else:
+            await bot.send_message(chat_id, "`Invalid number`")
+    
+    # Add task
+    elif text.lower().startswith("add "):
+        try:
+            parts = text[4:].strip().split()
+            optional = parts[-1].lower() == "optional"
+            if optional:
+                parts = parts[:-1]
+            
+            duration = int(parts[-1])
+            task_name = " ".join(parts[:-1])
+            
+            if routine.add_task(task_name, duration, optional):
+                save_routines()
+                await bot.send_message(chat_id, f"`Added: {task_name}`")
+                await edit_routine(message, state)
+            else:
+                await bot.send_message(chat_id, "`Max 15 tasks`")
+        except (ValueError, IndexError):
+            await bot.send_message(chat_id, "`Invalid format`")
+    else:
+        await bot.send_message(chat_id, "`Invalid command`")
+
+@dp.message(StepsForm.SETTINGS, F.text == "Reset")
+async def reset_routine_confirm(message: types.Message, state: FSMContext):
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Confirm Reset")],
+            [KeyboardButton(text="Cancel")]
+        ]
+    )
+    
+    await bot.send_message(
+        message.from_user.id,
+        "*Reset routine?*\n\nClears tasks, keeps statistics",
+        reply_markup=markup
+    )
+
+
+@dp.message(StepsForm.SETTINGS, F.text == "Confirm Reset")
+async def reset_routine_confirmed(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    routine.tasks = []
+    routine.is_setup_complete = False
+    save_routines()
+    
+    await bot.send_message(chat_id, "`Routine reset`")
+    await state.set_state(StepsForm.SETUP_ADD_TASK)
+    await setup_start(message, state)
+
+
+@dp.message(StepsForm.SETTINGS, F.text == "Delete All")
+async def delete_data_confirm(message: types.Message, state: FSMContext):
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="Confirm Delete")],
+            [KeyboardButton(text="Cancel")]
+        ]
+    )
+    
+    await bot.send_message(
+        message.from_user.id,
+        "*Delete all data?*\n\n`Cannot be undone`",
+        reply_markup=markup
+    )
+
+
+@dp.message(StepsForm.SETTINGS, F.text == "Confirm Delete")
+async def delete_data_confirmed(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    if chat_id in routines_dict:
+        del routines_dict[chat_id]
+        if chat_id in user_replies:
+            del user_replies[chat_id]
+        save_routines()
+    
+    await bot.send_message(chat_id, "`All data deleted`\nUse /start to begin")
+    await state.clear()
+
+
+@dp.message(StepsForm.SETTINGS, F.text == "Cancel")
+async def cancel_action(message: types.Message, state: FSMContext):
+    await show_settings(message, state)
+
+
+@dp.message(StepsForm.SETTINGS, F.text == "Menu")
+async def settings_to_menu(message: types.Message, state: FSMContext):
+    await show_main_menu(message.from_user.id, state)
 
 async def on_startup(chat_id:int, task_dictionary:dict) -> None:   
     await bot.send_message(chat_id, "Bot has been started!", disable_notification=True)
@@ -721,74 +880,114 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
     asyncio.create_task(scheduled_messages(task_dictionary))
 
 async def action_over_time(current_time) -> None:
-    global task_dictionary
-    date_time = current_time
-    current_time = current_time.time()
+    """Scheduled tasks that run at specific times"""
+    global routines_dict
+    time_now = current_time.time()
     
-    # Helper function to handle blocked users
-    async def handle_blocked_user(chat_ids, e):
-        if 'forbidden: bot was blocked' in str(e).lower():
-            del task_dictionary[chat_ids]
-            CONSOLE = f'''\n\n\n
-                        CHAT_ID blocked us,\n
-                        we delete him {chat_ids}\n\n\n''' 
-            print(CONSOLE)
-            return True
-        return False
+    # Morning reminder - 6:00 AM (SILENT)
+    if time_now.hour == 6 and time_now.minute == 0:
+        for chat_id, routine in list(routines_dict.items()):
+            if not routine.is_setup_complete:
+                continue
+            
+            today = datetime.date.today().isoformat()
+            if today not in routine.history:
+                try:
+                   await bot.send_message(
+                        chat_id,
+                        make_header("Good morning") + "Ready to start?",
+                        disable_notification=True
+                    )
+                except Exception as e:
+                    if 'blocked' in str(e).lower():
+                        del routines_dict[chat_id]
+                        print(f"Removed blocked user: {chat_id}")
     
-    # END OF DAY - Evening success message at 21:40
-    if current_time.hour == 23 and current_time.minute == 0:
-        for chat_ids in list(task_dictionary.keys()):
-            task_dictionary[chat_ids].check(date_time)
-            CONSOLE = f'''\n 
-                        CONSOLE: sending user scheduled message <success for today>\n
-                        CHAT_ID: {chat_ids}\n
-               '''
-            print(CONSOLE)
-            try:
-                base_message = task_dictionary[chat_ids].__str__() + '\n\n\n'
-                
-                # Include pickup line only if rizz is enabled
-                if task_dictionary[chat_ids].rizz_enabled:
-                    base_message += f"      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n"
-                
-                base_message += "<i><b>Today's</b> accomplishments.</i> \n\n<code>Great job</code>"
-                
-                await bot.send_message(
-                    chat_ids,
-                    base_message,
-                    parse_mode='HTML',
-                    disable_notification=True
-                )   
-            except Exception as e:
-                await handle_blocked_user(chat_ids, e)
-               
-    # RESET TASKS - Reset tasks at 1:00 AM
-    if current_time.hour == 1 and current_time.minute == 0:  # 01:00 AM
-        for chat_ids in list(task_dictionary.keys()):
-            task_dictionary[chat_ids].check(date_time)
-            CONSOLE = f'''\n 
-                        CONSOLE: sending user scheduled message <reset today's tasks>\n
-                        CHAT_ID: {chat_ids}\n
-               '''
-            print(CONSOLE)
-            task_dictionary[chat_ids].tasks = [Task(task.name, task.remaining_time) for task in task_dictionary[chat_ids].tasks_template]
+    # Warning - 10:00 AM (SILENT)
+    elif time_now.hour == 10 and time_now.minute == 0:
+        for chat_id, routine in list(routines_dict.items()):
+            if not routine.is_setup_complete:
+                continue
+            
+            today = datetime.date.today().isoformat()
+            if today not in routine.history:
+                try:
+                    await bot.send_message(
+                        chat_id,
+                        f"*⏰ 1 hour left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
+                        disable_notification=True
+                    )
+                except Exception as e:
+                    if 'blocked' in str(e).lower():
+                        del routines_dict[chat_id]
+    
+    # Check for missed routines - 11:30 AM
+    elif time_now.hour == 11 and time_now.minute == 30:
+        for chat_id, routine in list(routines_dict.items()):
+            if not routine.is_setup_complete:
+                continue
+            
+            routine.check_missed_routine()
+            
+            today = datetime.date.today().isoformat()
+            if routine.history.get(today, {}).get('missed', False):
+                try:
+                    await bot.send_message(
+                        chat_id,
+                        "*Window closed*\n\nStreak reset\\. Tomorrow is fresh\\.",
+                        disable_notification=True
+                    )
+                except Exception as e:
+                    if 'blocked' in str(e).lower():
+                        del routines_dict[chat_id]
+        
+        save_routines()
+    
+    # Evening success message - 9:00 PM (SILENT)
+    elif time_now.hour == 21 and time_now.minute == 0:
+        for chat_id, routine in list(routines_dict.items()):
+            today = datetime.date.today().isoformat()
+            day_data = routine.history.get(today, {})
+            
+            if day_data.get('completion', 0) >= 80:
+                try:
+                    streak_bar = "━" * min(routine.current_streak, 10)
+                    streak_display = min(routine.current_streak, 10)
+                    streak_bar = make_streak_bar(routine.current_streak, 10)
+                    await bot.send_message(
+                        chat_id,
+                        make_header("Great day!") + f"\n{streak_bar}\n`{routine.current_streak}d`",
+                        disable_notification=True
+                    )
+                except Exception as e:
+                    if 'blocked' in str(e).lower():
+                        del routines_dict[chat_id]
+    
+    # Weekly report - Sunday 8:00 PM (SILENT)
+    elif time_now.weekday() == 6 and time_now.hour == 20 and time_now.minute == 0:
+        for chat_id, routine in list(routines_dict.items()):
+            if not routine.is_setup_complete:
+                continue
+            
+            stats = routine.get_weekly_stats()
+            visual = create_week_visual(routine)
+            
+            report = f"""*WEEK COMPLETE*
+
+{visual}
+
+`{stats['completed_days']}/7` days
+`{stats['avg_completion']:.0f}%` average
+`{stats['current_streak']}d` current streak
+`{stats['best_streak']}d` best
+
+{get_weekly_insights(stats)}"""
             
             try:
-                base_message = "Your tasks for today have been set up"
-                
-                # Include pickup line only if rizz is enabled
-                if task_dictionary[chat_ids].rizz_enabled:
-                    base_message = f"\n      ---\n{random.choice(list(pickup_lines))}\n      ---\n\n" + base_message
-                
-                await bot.send_message(
-                    chat_ids, 
-                    base_message, 
-                    parse_mode='HTML', 
-                    disable_notification=True
-                )
+                await bot.send_message(chat_id, report, disable_notification=True)
             except Exception as e:
-                await handle_blocked_user(chat_ids, e)
+                if 'blocked' in str(e).lower():
+                    del routines_dict[chat_id]
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
@@ -800,53 +999,78 @@ async def scheduled_messages(task_dictionary:dict):
         # Sleep for a minute and check again
         await asyncio.sleep(60)
 
-def save_dict_to_json(data:dict, json_file:str) -> None:
-    new_data = data.copy()
-    for chat_id, to_do_list in new_data.items():
-        new_data[chat_id] = to_do_list.__dict__()
-    with open(json_file, 'w') as file:
-        json.dump(new_data, file, indent=4)
- 
-def initial_set_up(json_file:str) -> dict:
+def save_routines() -> None:
+    """Save all routines to JSON"""
+    data = {
+        'routines': {
+            str(chat_id): routine.to_dict() 
+            for chat_id, routine in routines_dict.items()
+        },
+        'user_replies': {
+            str(chat_id): replies
+            for chat_id, replies in user_replies.items()
+        }
+    }
+    with open(FILE_NAME, 'w') as f:
+        json.dump(data, f, indent=2)
+
+
+def load_routines() -> dict:
+    """Load routines from JSON"""
     try:
-        new_data = {}
-        with open(json_file, 'r') as file:
-            data = json.load(file)
-
-            if isinstance(data, dict):
-                for key, value in data.items():
-                    to_do_list = ToDoList(key) # chat id
-                    to_do_list.unpacking(dictionary=value)
-                    new_data[int(key)] = to_do_list
-
-                return new_data
-            else:
-                raise ValueError("The JSON file does not contain a valid dictionary.")
+        with open(FILE_NAME, 'r') as f:
+            data = json.load(f)
+        
+        # Load routines
+        routines = {}
+        routine_data = data.get('routines', data) if isinstance(data.get('routines'), dict) else data
+        for chat_id, routine_info in routine_data.items():
+            routines[int(chat_id)] = MorningRoutine.from_dict(routine_info)
+        
+        # Load custom replies
+        global user_replies
+        if 'user_replies' in data:
+            user_replies = {int(k): v for k, v in data['user_replies'].items()}
+        else:
+            user_replies = {}
+        
+        print(f"Loaded {len(routines)} routines from file")
+        return routines
+    
     except FileNotFoundError:
-        print('\n\n\n\nJSON file was not observed\n\n\n\n')
+        print("No existing routines file found")
         return {}
     except json.JSONDecodeError:
-        raise ValueError(f"\n\n\n\nThe JSON file '{json_file}' is not valid JSON.\n\n\n\n")
+        print("ERROR: Invalid JSON in routines file")
         return {}
-    except ValueError as e:
-        print('\n\n\n\nCheck initial_set_up() function and JSON file, something is bad here')
-        print(e)
-        print('\n\n\n')
+    except Exception as e:
+        print(f"ERROR loading routines: {e}")
         return {}
-    return {}
 
 async def main() -> None:
-
     try:
-        global FILE_NAME, FSMContext_file, task_dictionary
+        global FILE_NAME, routines_dict
         
-        FILE_NAME = './data.json'
-        task_dictionary = initial_set_up(FILE_NAME)
-        await on_startup(773603143, task_dictionary) # my chat id
-
+        FILE_NAME = './routines_data.json'
+        routines_dict = load_routines()
+        
+        print(f"Bot starting with {len(routines_dict)} existing users")
+        
+        # Start scheduled messages
+        asyncio.create_task(scheduled_messages())
+        
         await dp.start_polling(bot)
     finally:
+        save_routines()
         await bot.session.close()
+
+
+async def scheduled_messages():
+    """Background task for scheduled notifications"""
+    while True:
+        current_time = datetime.datetime.now()
+        await action_over_time(current_time)
+        await asyncio.sleep(60)  # Check every minute
 
 if __name__ == "__main__":
     asyncio.run(main())
