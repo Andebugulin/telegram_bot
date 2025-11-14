@@ -1220,10 +1220,9 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
 async def action_over_time(current_time) -> None:
     """Scheduled tasks that run at specific times"""
     global routines_dict
-    time_now = current_time.time()
     
     # Morning reminder - 6:00 AM (SILENT)
-    if time_now.hour == 6 and time_now.minute == 0:
+    if current_time.hour == 6 and current_time.minute == 0:
         for chat_id, routine in list(routines_dict.items()):
             if not routine.is_setup_complete:
                 continue
@@ -1242,7 +1241,7 @@ async def action_over_time(current_time) -> None:
                         print(f"Removed blocked user: {chat_id}")
     
     # Warning - 10:00 AM (SILENT)
-    elif time_now.hour == 10 and time_now.minute == 0:
+    elif current_time.hour == 10 and current_time.minute == 0:
         for chat_id, routine in list(routines_dict.items()):
             if not routine.is_setup_complete:
                 continue
@@ -1260,7 +1259,7 @@ async def action_over_time(current_time) -> None:
                         del routines_dict[chat_id]
     
     # Check for missed routines - 11:30 AM
-    elif time_now.hour == 11 and time_now.minute == 30:
+    elif current_time.hour == 11 and current_time.minute == 30:
         for chat_id, routine in list(routines_dict.items()):
             if not routine.is_setup_complete:
                 continue
@@ -1282,15 +1281,13 @@ async def action_over_time(current_time) -> None:
         save_routines()
     
     # Evening success message - 9:00 PM (SILENT)
-    elif time_now.hour == 21 and time_now.minute == 0:
+    elif current_time.hour == 21 and current_time.minute == 0:
         for chat_id, routine in list(routines_dict.items()):
             today = datetime.date.today().isoformat()
             day_data = routine.history.get(today, {})
             
             if day_data.get('completion', 0) >= 80:
                 try:
-                    streak_bar = "━" * min(routine.current_streak, 10)
-                    streak_display = min(routine.current_streak, 10)
                     streak_bar = make_streak_bar(routine.current_streak, 10)
                     await bot.send_message(
                         chat_id,
@@ -1302,7 +1299,7 @@ async def action_over_time(current_time) -> None:
                         del routines_dict[chat_id]
     
     # Weekly report - Sunday 8:00 PM (SILENT)
-    elif time_now.weekday() == 6 and time_now.hour == 20 and time_now.minute == 0:
+    elif current_time.weekday() == 6 and current_time.hour == 20 and current_time.minute == 0:
         for chat_id, routine in list(routines_dict.items()):
             if not routine.is_setup_complete:
                 continue

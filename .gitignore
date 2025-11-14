@@ -2,3 +2,5 @@ venv
 .env
 __pycache__
 .vscode
+data.json
+routines_data.json
