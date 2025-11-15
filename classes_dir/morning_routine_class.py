@@ -10,6 +10,8 @@ class RoutineTask:
         self.notes = notes
         self.completed = False
         self.completed_at = None
+        self.skipped = False
+
     
     def mark_complete(self):
         self.completed = True
@@ -18,6 +20,7 @@ class RoutineTask:
     def reset(self):
         self.completed = False
         self.completed_at = None
+        self.skipped = False
     
     def to_dict(self):
         return {
@@ -26,13 +29,15 @@ class RoutineTask:
             'optional': self.optional,
             'notes': self.notes,
             'completed': self.completed,
-            'completed_at': self.completed_at.isoformat() if self.completed_at else None
+            'completed_at': self.completed_at.isoformat() if self.completed_at else None,
+            'skipped': self.skipped
         }
     
     @classmethod
     def from_dict(cls, data):
         task = cls(data['name'], data['duration'], data.get('optional', False), data.get('notes', ''))
         task.completed = data.get('completed', False)
+        task.skipped = data.get('skipped', False)
         if data.get('completed_at'):
             task.completed_at = datetime.datetime.fromisoformat(data['completed_at'])
         return task
@@ -123,8 +128,15 @@ class MorningRoutine:
         return True
     
     def can_start_routine(self) -> bool:
-        """Check if within time window"""
+        """Check if within time window and not already done today"""
         now = datetime.datetime.now()
+        today = datetime.date.today().isoformat()
+        
+        # Check if already completed today
+        if today in self.history:
+            return False
+        
+        # Check time window
         return self.window_start <= now.hour < self.window_end
     
     def pause_routine(self):

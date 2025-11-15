@@ -33,12 +33,12 @@ dp = Dispatcher()
 # ═══════════════════════════════════════════════════════════════
 
 # Box characters
-BOX_TOP = "━━━━━━━"
-BOX_SIDE = " "
+BOX_TOP = "━"
+BOX_SIDE = ""
 BOX_CORNER_TL = "┏"
-BOX_CORNER_TR = "┓"
+BOX_CORNER_TR = " "
 BOX_CORNER_BL = "┗"
-BOX_CORNER_BR = "┛"
+BOX_CORNER_BR = ""
 
 # Separators
 SEPARATOR_LIGHT = "─────────────────────"
@@ -70,7 +70,7 @@ SP = "\u2009"  # Thin space that Telegram respects
 # Helper functions for UI
 def make_header(text):
     """Create centered header box"""
-    padding = (16 - len(text)) // 2
+    padding = 2 
     padded_text = " " * padding + text + " " * (20 - len(text) - padding)
     return f"{BOX_CORNER_TL}{BOX_TOP}{BOX_CORNER_TR}\n{BOX_SIDE}*{padded_text}*{BOX_SIDE}\n{BOX_CORNER_BL}{BOX_TOP}{BOX_CORNER_BR}\n"
 
@@ -280,11 +280,11 @@ async def send_next_task(chat_id: int, state: FSMContext):
     """Send next uncompleted task - watch-friendly"""
     routine = routines_dict[chat_id]
     
-    # Find next uncompleted task
+   # Find next uncompleted AND not skipped task
     next_task = None
     task_num = None
     for i, task in enumerate(routine.tasks):
-        if not task.completed:
+        if not task.completed and not task.skipped:
             next_task = task
             task_num = i + 1
             break
@@ -334,14 +334,20 @@ async def handle_task_response(message: types.Message, state: FSMContext):
         return
     
     if text == "Skip":
-        # Just move to next task without marking complete
+        # Mark current task as skipped (counts as failed)
+        for i, task in enumerate(routine.tasks):
+            if not task.completed and not task.skipped:
+                task.skipped = True
+                save_routines()
+                break
+        
         await send_next_task(chat_id, state)
         return
     
     # Any other response = task completed
     # Find current uncompleted task
     for i, task in enumerate(routine.tasks):
-        if not task.completed:
+        if not task.completed and not task.skipped:
             routine.complete_task(i)
             save_routines()
             break
@@ -415,7 +421,7 @@ def get_encouragement_message(streak: int) -> str:
         return "Three months"
     else:
         return "Keep going"
-    
+
 @dp.message(StepsForm.MENU, F.text == "Stats")
 async def view_stats(message: types.Message, state: FSMContext):
     chat_id = message.from_user.id
@@ -907,26 +913,32 @@ async def handle_task_response(message: types.Message, state: FSMContext):
 async def send_next_task(chat_id: int, state: FSMContext):
     routine = routines_dict[chat_id]
     
+    # Find next uncompleted AND not skipped task
     next_task = None
     task_num = None
     for i, task in enumerate(routine.tasks):
-        if not task.completed:
+        print(f"DEBUG: Task {i}: {task.name}, completed={task.completed}, skipped={task.skipped}")
+        if not task.completed and not task.skipped:
             next_task = task
             task_num = i + 1
+            print(f"DEBUG: Selected task {i}: {task.name}")
             break
     
     if next_task:
         await state.set_state(StepsForm.ROUTINE_ACTIVE_WAITING)
         
-        remaining = sum(1 for t in routine.tasks if not t.completed)
-        completion = routine.get_completion_percentage()
+        # Calculate based on ALL tasks (not just required)
+        total_tasks = len(routine.tasks)
+        completed_tasks = sum(1 for t in routine.tasks if t.completed)
+        skipped_tasks = sum(1 for t in routine.tasks if t.skipped)
+        remaining = total_tasks - completed_tasks - skipped_tasks
+        completion = ((completed_tasks + skipped_tasks) / total_tasks) * 100 if total_tasks > 0 else 0
         
         opt_label = " `opt`" if next_task.optional else ""
         notes_text = f"\n_{next_task.notes}_\n" if next_task.notes else "\n"
         
-        total_tasks = len([t for t in routine.tasks if not t.optional])
-        completed_tasks = total_tasks - remaining
-        progress_bar = make_progress_bar((completed_tasks / total_tasks) * 100, 20)
+        # Progress bar based on completion percentage
+        progress_bar = make_progress_bar(completion, 20)
         
         text = make_header(f"TASK {task_num}") + f"""
 *{next_task.name}*
@@ -1216,6 +1228,34 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
 
     # Schedule the message to be sent daily at 12:00
     asyncio.create_task(scheduled_messages(task_dictionary))
+
+@dp.message(StepsForm.MENU)
+async def handle_menu_fallback(message: types.Message, state: FSMContext):
+    """Catch-all for menu - handles watch quick replies"""
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    # List of known button commands
+    known_commands = ["Start Routine", "Continue", "Resume", "Stats", "Settings"]
+    
+    # If it's a known command, ignore it (other handlers will catch it)
+    if text in known_commands:
+        return
+    
+    # Otherwise, treat as quick reply
+    replies = user_replies.get(chat_id, DEFAULT_REPLIES)
+    
+    if text in replies and routine.can_start_routine() and not routine.routine_started:
+        if routine.start_routine():
+            await state.set_state(StepsForm.ROUTINE_ACTIVE)
+            save_routines()
+            await send_next_task(chat_id, state)
+        else:
+            await bot.send_message(chat_id, "`Could not start routine`")
+    else:
+        # Unknown command
+        await show_main_menu(chat_id, state)
 
 async def action_over_time(current_time) -> None:
     """Scheduled tasks that run at specific times"""
