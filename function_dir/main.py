@@ -889,13 +889,6 @@ async def handle_task_response(message: types.Message, state: FSMContext):
         await show_main_menu(chat_id, state)
         return
     
-    if text == "Pause":
-        if routine.pause_routine():
-            save_routines()
-            await bot.send_message(chat_id, "`Routine paused`")
-            await show_main_menu(chat_id, state)
-        return
-    
     if text == "Skip":
         await send_next_task(chat_id, state)
         return
@@ -950,7 +943,7 @@ async def send_next_task(chat_id: int, state: FSMContext):
         
         replies = user_replies.get(chat_id, DEFAULT_REPLIES)
         buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
-        buttons.append([KeyboardButton(text="Skip"), KeyboardButton(text="Pause")])
+        buttons.append([KeyboardButton(text="Skip")])
         buttons.append([KeyboardButton(text="Menu")])
         
         markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
@@ -1062,7 +1055,7 @@ async def show_main_menu(chat_id: int, state: FSMContext):
     
     buttons = []
     
-    if routine.routine_started and routine.paused:
+    if routine.routine_started:
         buttons.append([KeyboardButton(text="Resume")])
     elif routine.can_start_routine() and not routine.routine_started:
         buttons.append([KeyboardButton(text="Start Routine")])
