@@ -33,7 +33,7 @@ dp = Dispatcher()
 # ═══════════════════════════════════════════════════════════════
 
 # Box characters
-BOX_TOP = "━━━━━━━━━━━━━━━━━━━━"
+BOX_TOP = "━━━━━━━"
 BOX_SIDE = " "
 BOX_CORNER_TL = "┏"
 BOX_CORNER_TR = "┓"
