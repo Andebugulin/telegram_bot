@@ -70,9 +70,9 @@ SP = "\u2009"  # Thin space that Telegram respects
 # Helper functions for UI
 def make_header(text):
     """Create centered header box"""
-    padding = (20 - len(text)) // 2
+    padding = (16 - len(text)) // 2
     padded_text = " " * padding + text + " " * (20 - len(text) - padding)
-    return f"{BOX_CORNER_TL}{BOX_TOP}{BOX_CORNER_TR}\n{BOX_SIDE}*             {padded_text}*{BOX_SIDE}\n{BOX_CORNER_BL}{BOX_TOP}{BOX_CORNER_BR}\n"
+    return f"{BOX_CORNER_TL}{BOX_TOP}{BOX_CORNER_TR}\n{BOX_SIDE}*{padded_text}*{BOX_SIDE}\n{BOX_CORNER_BL}{BOX_TOP}{BOX_CORNER_BR}\n"
 
 def make_progress_bar(percentage, length=20):
     """Create progress bar"""
