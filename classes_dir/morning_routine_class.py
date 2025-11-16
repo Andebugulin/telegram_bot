@@ -192,8 +192,8 @@ class MorningRoutine:
             'tasks': [t.to_dict() for t in self.tasks]
         }
         
-        # Streak: 80%+ = maintain, else reset
-        if completion >= 80:
+        # Streak: 100% = maintain, else reset
+        if completion >= 100:
             self.current_streak += 1
             self.total_completions += 1
             if self.current_streak > self.best_streak:
@@ -225,7 +225,7 @@ class MorningRoutine:
             date = (datetime.date.today() - datetime.timedelta(days=i)).isoformat()
             last_7_days.append(self.history.get(date, {'completion': 0}))
         
-        completed_days = sum(1 for d in last_7_days if d.get('completion', 0) >= 80)
+        completed_days = sum(1 for d in last_7_days if d.get('completion', 0) >= 100)
         avg_completion = sum(d.get('completion', 0) for d in last_7_days) / 7
         
         return {

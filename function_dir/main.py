@@ -376,7 +376,7 @@ async def finish_routine_confirmed(chat_id: int, state: FSMContext):
     
     completion = routine.get_completion_percentage()
     
-    if completion >= 80:
+    if completion >= 100:
         progress_bar = make_progress_bar(completion, 20)
         streak_bar = make_streak_bar(routine.current_streak, 10)
         
@@ -473,7 +473,7 @@ def create_week_visual(routine: MorningRoutine) -> str:
         completion = day_data.get('completion', 0)
         if day_data.get('missed', False):
             emoji = CAL_MISSED + ' '
-        elif completion >= 80:
+        elif completion >= 100:
             emoji = CAL_COMPLETE + ' '
         elif completion > 0:
             emoji = CAL_PARTIAL + ' '
@@ -557,7 +557,7 @@ def create_month_visual(routine: MorningRoutine) -> str:
                 
                 if day_data.get('missed', False):
                     emoji = f"`{CAL_MISSED} `"
-                elif completion >= 80:
+                elif completion >= 100:
                     emoji = f"`{CAL_COMPLETE} `"
                 elif completion > 0:
                     emoji = f"`{CAL_PARTIAL} `"
@@ -1346,7 +1346,7 @@ async def action_over_time(current_time) -> None:
             elif user_time.hour == 21 and user_time.minute == 0:
                 day_data = routine.history.get(today, {})
                 
-                if day_data.get('completion', 0) >= 80:
+                if day_data.get('completion', 0) >= 100:
                     streak_bar = make_streak_bar(routine.current_streak, 10)
                     await bot.send_message(
                         chat_id,
