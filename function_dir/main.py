@@ -1058,9 +1058,7 @@ async def show_main_menu(chat_id: int, state: FSMContext):
     
     buttons = []
     
-    if routine.routine_started:
-        buttons.append([KeyboardButton(text="Resume")])
-    elif routine.can_start_routine() and not routine.routine_started:
+    if routine.can_start_routine() and not routine.routine_started:
         buttons.append([KeyboardButton(text="Start Routine")])
     elif routine.routine_started:
         buttons.append([KeyboardButton(text="Continue")])
@@ -1072,19 +1070,6 @@ async def show_main_menu(chat_id: int, state: FSMContext):
     markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
     
     await bot.send_message(chat_id, status, reply_markup=markup)
-
-
-@dp.message(StepsForm.MENU, F.text == "Resume")
-async def resume_routine(message: types.Message, state: FSMContext):
-    chat_id = message.from_user.id
-    routine = routines_dict[chat_id]
-    
-    if routine.resume_routine():
-        save_routines()
-        await state.set_state(StepsForm.ROUTINE_ACTIVE)
-        await send_next_task(chat_id, state)
-    else:
-        await bot.send_message(chat_id, "`Cannot resume`")
 
 @dp.message(StepsForm.SETTINGS_CUSTOMIZE_REPLIES)
 async def handle_customize_replies(message: types.Message, state: FSMContext):
@@ -1292,7 +1277,7 @@ async def handle_menu_fallback(message: types.Message, state: FSMContext):
     text = message.text.strip()
     
     # List of known button commands
-    known_commands = ["Start Routine", "Continue", "Resume", "Stats", "Settings"]
+    known_commands = ["Start Routine", "Continue", "Stats", "Settings"]
     
     # If it's a known command, ignore it (other handlers will catch it)
     if text in known_commands:
