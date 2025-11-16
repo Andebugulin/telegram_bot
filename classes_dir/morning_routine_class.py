@@ -59,6 +59,7 @@ class MorningRoutine:
         # Customizable time window (hours)
         self.window_start = 5
         self.window_end = 11
+        self.timezone = 'Europe/Helsinki'  # Default timezone
     
     def add_task(self, name: str, duration: int, optional: bool = False, notes: str = "") -> tuple[bool, str]:
         """Add task with validation. Returns (success, error_message)"""
@@ -129,8 +130,10 @@ class MorningRoutine:
     
     def can_start_routine(self) -> bool:
         """Check if within time window and not already done today"""
-        now = datetime.datetime.now()
-        today = datetime.date.today().isoformat()
+        # Use user's timezone
+        user_tz = pytz.timezone(self.timezone)
+        now = datetime.datetime.now(user_tz)
+        today = now.date().isoformat()
         
         # Check if already completed today
         if today in self.history:
@@ -203,8 +206,9 @@ class MorningRoutine:
         return True
     
     def check_missed_routine(self):
-        now = datetime.datetime.now()
-        today = datetime.date.today().isoformat()
+        user_tz = pytz.timezone(self.timezone)
+        now = datetime.datetime.now(user_tz)
+        today = now.date().isoformat()
         
         if now.hour >= self.window_end and today not in self.history:
             self.history[today] = {
@@ -287,7 +291,8 @@ class MorningRoutine:
             'pause_time': self.pause_time.isoformat() if self.pause_time else None,
             'total_pause_duration': self.total_pause_duration,
             'window_start': self.window_start,
-            'window_end': self.window_end
+            'window_end': self.window_end,
+            'timezone': self.timezone
         }
     
     @classmethod
@@ -308,4 +313,5 @@ class MorningRoutine:
         routine.total_pause_duration = data.get('total_pause_duration', 0)
         routine.window_start = data.get('window_start', 5)
         routine.window_end = data.get('window_end', 11)
+        routine.timezone = data.get('timezone', 'Europe/Helsinki')
         return routine

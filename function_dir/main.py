@@ -16,6 +16,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from classes_dir.morning_routine_class import MorningRoutine
+import pytz
 
 # Load environment
 load_dotenv()
@@ -635,6 +636,7 @@ Customize experience
         keyboard=[
             [KeyboardButton(text="Edit Routine")],
             [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
+            [KeyboardButton(text="Timezone")],
             [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
             [KeyboardButton(text="Menu")]
         ]
@@ -1036,6 +1038,7 @@ Customize experience
         keyboard=[
             [KeyboardButton(text="Edit Routine")],
             [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
+            [KeyboardButton(text="Timezone")],
             [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
             [KeyboardButton(text="Menu")]
         ],
@@ -1102,8 +1105,67 @@ async def handle_customize_replies(message: types.Message, state: FSMContext):
         await show_settings(message, state)
     else:
         await bot.send_message(chat_id, "`Send 3\\-5 words separated by commas`")
+    
+@dp.message(StepsForm.SETTINGS, F.text == "Timezone")
+async def customize_timezone(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_TIMEZONE)
+    
+    text = make_header("TIMEZONE") + f"""
+*Current:*
+`{routine.timezone}`
+
+{SEPARATOR_LIGHT}
+
+*Common timezones:*
+`Europe/Helsinki`
+`Europe/Stockholm`
+`America/New_York`
+`Asia/Tokyo`
+
+*Change timezone:*
+`timezone Europe/London`
+
+[Full list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="timezone Europe/Helsinki")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
 
 
+@dp.message(StepsForm.SETTINGS_EDIT_TIMEZONE)
+async def handle_timezone_change(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text.lower() == "back":
+        await show_settings(message, state)
+        return
+    
+    parts = text.split(maxsplit=1)
+    if len(parts) == 2 and parts[0].lower() == "timezone":
+        tz_name = parts[1]
+        try:
+            # Validate timezone
+            pytz.timezone(tz_name)
+            routine.timezone = tz_name
+            save_routines()
+            await bot.send_message(chat_id, f"`Timezone set to {tz_name}`")
+            await show_settings(message, state)
+        except pytz.exceptions.UnknownTimeZoneError:
+            await bot.send_message(chat_id, "`Invalid timezone\\. Check spelling\\.`")
+    else:
+        await bot.send_message(chat_id, "`Format: timezone Europe/Helsinki`")
 
 @dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
 async def handle_edit_routine(message: types.Message, state: FSMContext):
@@ -1254,93 +1316,65 @@ async def action_over_time(current_time) -> None:
     """Scheduled tasks that run at specific times"""
     global routines_dict
     
-    # Morning reminder - 6:00 AM (SILENT)
-    if current_time.hour == 6 and current_time.minute == 0:
-        for chat_id, routine in list(routines_dict.items()):
-            if not routine.is_setup_complete:
-                continue
+    # Check notifications for each user in their timezone
+    for chat_id, routine in list(routines_dict.items()):
+        if not routine.is_setup_complete:
+            continue
+        
+        try:
+            # Get current time in user's timezone
+            user_tz = pytz.timezone(routine.timezone)
+            user_time = datetime.datetime.now(user_tz)
+            today = user_time.date().isoformat()
             
-            today = datetime.date.today().isoformat()
-            if today not in routine.history:
-                try:
-                   await bot.send_message(
+            # Morning reminder - 6:00 AM (SILENT)
+            if user_time.hour == 6 and user_time.minute == 0:
+                if today not in routine.history:
+                    await bot.send_message(
                         chat_id,
                         make_header("Good morning") + "Ready to start?",
                         disable_notification=True
                     )
-                except Exception as e:
-                    if 'blocked' in str(e).lower():
-                        del routines_dict[chat_id]
-                        print(f"Removed blocked user: {chat_id}")
-    
-    # Warning - 10:00 AM (SILENT)
-    elif current_time.hour == 10 and current_time.minute == 0:
-        for chat_id, routine in list(routines_dict.items()):
-            if not routine.is_setup_complete:
-                continue
             
-            today = datetime.date.today().isoformat()
-            if today not in routine.history:
-                try:
+            # Warning - 10:00 AM (SILENT)
+            elif user_time.hour == 10 and user_time.minute == 0:
+                if today not in routine.history:
                     await bot.send_message(
                         chat_id,
                         f"*⏰ 1 hour left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
                         disable_notification=True
                     )
-                except Exception as e:
-                    if 'blocked' in str(e).lower():
-                        del routines_dict[chat_id]
-    
-    # Check for missed routines - 11:30 AM
-    elif current_time.hour == 11 and current_time.minute == 30:
-        for chat_id, routine in list(routines_dict.items()):
-            if not routine.is_setup_complete:
-                continue
             
-            routine.check_missed_routine()
-            
-            today = datetime.date.today().isoformat()
-            if routine.history.get(today, {}).get('missed', False):
-                try:
+            # Check for missed routines - 11:30 AM
+            elif user_time.hour == 11 and user_time.minute == 30:
+                routine.check_missed_routine()
+                
+                if routine.history.get(today, {}).get('missed', False):
                     await bot.send_message(
                         chat_id,
                         "*Window closed*\n\nStreak reset\\. Tomorrow is fresh\\.",
                         disable_notification=True
                     )
-                except Exception as e:
-                    if 'blocked' in str(e).lower():
-                        del routines_dict[chat_id]
-        
-        save_routines()
-    
-    # Evening success message - 9:00 PM (SILENT)
-    elif current_time.hour == 21 and current_time.minute == 0:
-        for chat_id, routine in list(routines_dict.items()):
-            today = datetime.date.today().isoformat()
-            day_data = routine.history.get(today, {})
+                save_routines()
             
-            if day_data.get('completion', 0) >= 80:
-                try:
+            # Evening success message - 9:00 PM (SILENT)
+            elif user_time.hour == 21 and user_time.minute == 0:
+                day_data = routine.history.get(today, {})
+                
+                if day_data.get('completion', 0) >= 80:
                     streak_bar = make_streak_bar(routine.current_streak, 10)
                     await bot.send_message(
                         chat_id,
                         make_header("Great day!") + f"\n{streak_bar}\n`{routine.current_streak}d`",
                         disable_notification=True
                     )
-                except Exception as e:
-                    if 'blocked' in str(e).lower():
-                        del routines_dict[chat_id]
-    
-    # Weekly report - Sunday 8:00 PM (SILENT)
-    elif current_time.weekday() == 6 and current_time.hour == 20 and current_time.minute == 0:
-        for chat_id, routine in list(routines_dict.items()):
-            if not routine.is_setup_complete:
-                continue
             
-            stats = routine.get_weekly_stats()
-            visual = create_week_visual(routine)
-            
-            report = f"""*WEEK COMPLETE*
+            # Weekly report - Sunday 8:00 PM (SILENT)
+            elif user_time.weekday() == 6 and user_time.hour == 20 and user_time.minute == 0:
+                stats = routine.get_weekly_stats()
+                visual = create_week_visual(routine)
+                
+                report = f"""*WEEK COMPLETE*
 
 {visual}
 
@@ -1350,12 +1384,13 @@ async def action_over_time(current_time) -> None:
 `{stats['best_streak']}d` best
 
 {get_weekly_insights(stats)}"""
-            
-            try:
+                
                 await bot.send_message(chat_id, report, disable_notification=True)
-            except Exception as e:
-                if 'blocked' in str(e).lower():
-                    del routines_dict[chat_id]
+        
+        except Exception as e:
+            if 'blocked' in str(e).lower():
+                del routines_dict[chat_id]
+                print(f"Removed blocked user: {chat_id}")
 
 async def scheduled_messages(task_dictionary:dict):
     while True:
