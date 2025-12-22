@@ -1312,8 +1312,8 @@ async def action_over_time(current_time) -> None:
             user_time = datetime.datetime.now(user_tz)
             today = user_time.date().isoformat()
             
-            # Morning reminder - 6:00 AM (SILENT)
-            if user_time.hour == 6 and user_time.minute == 0:
+            # Morning reminder - at window start (SILENT)
+            if user_time.hour == routine.window_start and user_time.minute == 0:
                 if today not in routine.history:
                     await bot.send_message(
                         chat_id,
@@ -1321,17 +1321,17 @@ async def action_over_time(current_time) -> None:
                         disable_notification=True
                     )
             
-            # Warning - 10:00 AM (SILENT)
-            elif user_time.hour == 10 and user_time.minute == 0:
+           # Warning - 1 hour before window ends (SILENT)
+            elif user_time.hour == (routine.window_end - 2) and user_time.minute == 0:
                 if today not in routine.history:
+                    hours_left = routine.window_end - user_time.hour
                     await bot.send_message(
                         chat_id,
-                        f"*⏰ 1 hour left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
+                        f"*⏰ {hours_left} hour{'s' if hours_left != 1 else ''} left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
                         disable_notification=True
                     )
-            
-            # Check for missed routines - 11:30 AM
-            elif user_time.hour == 11 and user_time.minute == 30:
+            # Check for missed routines - 30 minutes after window ends
+            elif user_time.hour == routine.window_end and user_time.minute == 30:
                 routine.check_missed_routine()
                 
                 if routine.history.get(today, {}).get('missed', False):

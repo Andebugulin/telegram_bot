@@ -1,180 +1,120 @@
----
+# Morner
 
-# Telegram Bot Morner
-
-\| To build consistent morning habits effortlessly \| </br>
-\| Make people feel better in general \| </br></br>
-\~ Ensures users efficiently complete their morning routines \~
+Telegram bot for morning routine tracking via smartwatch.
 
 <p align="center">
-  <img src="./PlaniriumBot.png" alt="Wizard" width="600"/>
+  <img src="./PlaniriumBot.png" alt="Morner Bot" width="600"/>
 </p>
 
-# Main Idea
+## Idea
 
-If you would like to have a morning routine, but often find yourself skipping it due to lack of motivation or forgetfulness, or you start to doomscroll on your phone
-and end up wasting your morning, this bot tries to help you.
-Many of us now have smartwatches and they are usually not as distracting as phones, the idea is to not use your phone, but rather rely on your watch to complete your morning routine.
+I believe mornings are more productive for our brain and mind. However, it is difficult to avoid distractions and not get pulled into the phone, hence comes the idea of this bot. You set up your morning routine once via phone, then every morning you interact with the bot via smartwatch using quick replies only, minimizing phone usage, keeping your head clear and not being too much noise is always good in my opinion.
 
-At first you setup morning routine with tasks, and I mean yes, this is easier on the phone, after that
-each morning you get silent notification on your watch, like "Ready to start?" in the watch you can choose any message from your quick replies, like "yes" or any ather one you want. Just send it, then the bot will understand that you have woken up and it will start guiding you through your routine, sending you each task one by one.
-After receiving another notification from the bot with the task, you can again use quick replies to respond with "Done", "Next", "Great" or any other message you set up.
-To make the task complete, just send almost any quick reply message, or press it on the phone.
-If you send "Skip" button, the bot will mark current task as failed and go to the next one.
+## Try It
 
-Be aware of your mornings and good luck :)
+Bot is already running and hosted on Oracle Cloud: [@PlanyDbot](https://t.me/PlanyDbot)
 
-#### \*hassle-free\*
+Send `/start` to begin.
 
-# Table of Contents
+## Features
 
-- [Installation](#installation)
-- [Usage](#usage)
-- [Contributing](#contributing)
-- [Support](#support)
-- [License](#license)
+Watch-optimized interface with customizable quick replies. Task management with optional/required task types. Configurable time windows and timezone support. Streak tracking with daily/weekly/monthly statistics. Silent notifications at routine start, warnings before deadline, and completion summaries. Pause/resume functionality for interrupted routines.
 
-## Installation
+## How It Works
 
-To get started with the bot, it's recommended to set up a virtual environment to manage dependencies. Here's a step-by-step guide:
+Setup your routine once through phone. Each morning you receive a silent notification on your watch. Tap any quick reply to start the routine. Complete tasks by tapping any quick reply button. The bot advances automatically regardless of which quick reply you use, since everyone has different button configurations on their watches.
 
-1. **Create a Virtual Environment (Optional but Recommended)**
+Special commands that require specific text: `Skip` (marks current task as skipped), `Menu` (returns to main menu).
 
-   - For Python users:
-     ```
-     python -m venv venv_name
-     ```
+Streaks require 100% completion of required tasks. Optional tasks don't affect your streak if skipped.
 
-2. **Activate the Virtual Environment**
+## Self-Hosting
 
-   - For Windows:
-     ```
-     venv_name\Scripts\activate
-     ```
-   - For macOS and Linux:
-     ```
-     source venv_name/bin/activate
-     ```
+If you prefer to run your own instance instead of using the hosted bot.
 
-3. **Clone the Repository**
+Requires Python 3.8+ and a Telegram bot token from [@BotFather](https://t.me/BotFather).
 
-   ```
-   git clone https://github.com/Andebugulin/telegram_bot.git
-   cd telegram_bot
-   ```
+```bash
+git clone https://github.com/Andebugulin/telegram_bot.git
+cd telegram_bot
+python -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements.txt
+```
 
-4. **Install Dependencies**
+Create `.env` file with your bot token:
 
-   - For Python:
-     ```
-     pip install -r requirements.txt
-     ```
+```
+BOT_TOKEN=your_token_here
+```
 
-5. **Set Up Bot Token**
+Run the bot:
 
-   - Obtain your bot token from [@BotFather](https://web.telegram.org/k/#@BotFather) on Telegram.
-   - Set the token in the configuration file or as an environment variable.
+```bash
+python function_dir/main.py
+```
 
-     #
+Data persists to `routines_data.json` in the project directory.
 
-     Here's an example of what your `.env` file might contain:
+## Task Setup
 
-     ```
-     BOT_TOKEN=YOUR_BOT_TOKEN_HERE
-     ```
+Send `/start` to begin setup. Add tasks using format: `task_name duration_minutes`. Optional tasks can be marked with `optional` flag. Maximum 15 tasks per routine.
 
-     #
+Example task format:
 
-6. **Run the Bot**
-   - Start the bot using the appropriate command:
-     - For Python:
-       ```
-       python function_dir/main.py
-       ```
+```
+Wake up 2
+Exercise 15
+Shower 10 optional
+```
 
-## Usage
+The bot operates within configured time windows (default 6-12 AM). Task status indicators: ✓ completed, ○ incomplete, `opt` for optional tasks. Statistics include 7-day and monthly calendar views, current/best streak tracking, and completion percentages.
 
-#### Routine Setup:
+## Configuration
 
-- **Initial Setup**: Add tasks with name, duration in minutes, and optional flag.
-  - Example: `Wake up 2`, `Exercise 15`, `Shower 10 optional`
-- **Task Management**: Up to 15 tasks per routine.
+Settings accessible through bot menu.
 
-#### Running Your Routine:
+Task editing commands:
 
-- **Start Routine**: Available during your configured time window (default 05:00-11:00).
-- **Task Flow**: Complete tasks one by one using quick reply buttons or "Skip" for tasks you can't complete, use your watch to respond easily.
-- **Watch Commands**: Use customizable quick replies ("Done", "Next", "Great") from your smartwatch.
-- **Progress Tracking**: Real-time progress bar shows completion percentage.
+```
+delete N          # remove task N
+edit N            # modify task N
+move N M          # reorder task N to position M
+add name duration # add new task
+```
 
-#### Task Status Indicators:
+Quick replies: Customize 3-5 button labels (format: `Done, Next, Great`)
 
-- ✓ **Completed**: Task finished successfully.
-- ○ **Incomplete**: Task not yet started or skipped.
-- **Optional tasks** are marked with `opt` label.
+Time window: Set routine hours (format: `window 6 12`)
 
-#### Statistics View:
+Timezone: Configure local timezone (format: `timezone Europe/Helsinki`)
 
-- **Weekly View**: 7-day calendar with completion status:
+Data management: Reset clears tasks while preserving statistics. Delete All removes everything.
 
-  - ● Done
-  - ◐ Partial completion
-  - ○ Missed
-  - × Failed (outside time window)
+## Notifications
 
-- **Monthly Calendar**: Full month view with daily completion tracking.
+All notifications are silent. Schedule based on configured time window:
 
-- **Streak Tracking**:
-  - Current streak
-  - Best streak record
-  - Total completions
+Window start: routine ready reminder
+2 hours before end: time remaining warning
+30 minutes after end: missed routine alert
+21:00: completion summary (if finished)
+Sunday 20:00: weekly statistics report
 
-#### Settings:
+## Technical Details
 
-- **Edit Routine**: Add, delete, move, or edit tasks.
+Built with aiogram 3.x for async Telegram bot operations. Uses FSM (Finite State Machine) pattern for conversation flow management. Data persistence via JSON file. Timezone handling through pytz library.
 
-  - Commands: `delete N`, `edit N`, `move N M`, `add name duration [optional]`
-
-- **Quick Replies**: Customize watch response buttons (3-5 words).
-
-  - Format: `Done, Next, Great`
-
-- **Time Window**: Set custom routine hours.
-
-  - Format: `window 6 12` (6 AM to 12 PM)
-
-- **Reset**: Clear tasks while keeping statistics.
-
-- **Delete All**: Remove all data and start fresh.
-
-#### Smart Notifications:
-
-- **06:00**: Morning reminder (silent) - "Ready to start?"
-- **10:00**: One-hour warning (silent)
-- **11:30**: Missed routine notification
-- **21:00**: Evening success message (if completed)
-- **Sunday 20:00**: Weekly report with statistics
-
-#### Command Flow:
-
-- **Navigation**: Use buttons to navigate between Menu, Stats, and Settings.
-- **Task Completion**: Respond with any quick reply or press "Done" to complete tasks.
-- **Skip Tasks**: Skip button marks optional tasks complete, leaves required tasks incomplete.
-- **Pause/Resume**: Pause routine anytime and resume later (pause time excluded from duration).
+State machine handles setup flow, menu navigation, active routine tracking, and settings modification. Automatic data saving after each state change.
 
 ## Contributing
 
-1. Fork the repository.
-2. Create a new branch: `git checkout -b feature-name`
-3. Make changes and commit: `git commit -am 'Add new feature'`
-4. Push to the branch: `git push origin feature-name`
-5. Submit a pull request.
-
-## Support
-
-- Email: gulin.andrey2005@gmail.com
-- Issue Tracker: [@Issues](https://github.com/Andebugulin/telegram_bot/issues)
+Standard fork and pull request workflow. Create feature branches for changes.
 
 ## License
 
-This project is licensed under the [MIT License] - see the [LICENSE.md](LICENSE) file for details.
+MIT License. See LICENSE.md for details.
+
+## Contact
+
+[GitHub Issues](https://github.com/Andebugulin/telegram_bot/issues)
