@@ -1276,25 +1276,36 @@ async def handle_menu_fallback(message: types.Message, state: FSMContext):
     routine = routines_dict[chat_id]
     text = message.text.strip()
     
-    # List of known button commands
+    # List of known button commands that should be ignored here
     known_commands = ["Start Routine", "Continue", "Stats", "Settings"]
     
     # If it's a known command, ignore it (other handlers will catch it)
     if text in known_commands:
         return
     
-    # Otherwise, treat as quick reply
-    replies = user_replies.get(chat_id, DEFAULT_REPLIES)
+    # Check if text is "Skip" - never start routine with this
+    if text == "Skip":
+        await bot.send_message(chat_id, "`Cannot start with Skip`")
+        return
     
-    if text in replies and routine.can_start_routine() and not routine.routine_started:
+    # ANY other text should start the routine if conditions are met
+    if routine.can_start_routine() and not routine.routine_started:
         if routine.start_routine():
             await state.set_state(StepsForm.ROUTINE_ACTIVE)
             save_routines()
             await send_next_task(chat_id, state)
         else:
-            await bot.send_message(chat_id, "`Could not start routine`")
+            now = datetime.datetime.now()
+            await bot.send_message(
+                chat_id,
+                f"`Routine window: 05:00 \\- 11:00`\n`Now: {now.strftime('%H:%M')}`"
+            )
+    elif routine.routine_started:
+        # If routine already started, go to continue
+        await state.set_state(StepsForm.ROUTINE_ACTIVE)
+        await send_next_task(chat_id, state)
     else:
-        # Unknown command
+        # Unknown situation, show menu
         await show_main_menu(chat_id, state)
 
 async def action_over_time(current_time) -> None:
