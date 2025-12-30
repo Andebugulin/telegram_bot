@@ -230,6 +230,16 @@ async def show_main_menu(chat_id: int, state: FSMContext):
     await state.set_state(StepsForm.MENU)
     routine = routines_dict[chat_id]
     
+    # SAFETY: If routine is started but window is closed, force finish it (routine continuation bug)
+    if routine.routine_started and not routine.can_start_routine():
+        user_tz = pytz.timezone(routine.timezone)
+        now = datetime.datetime.now(user_tz)
+        
+        # If we're past the window end, force finish
+        if now.hour >= routine.window_end:
+            routine.finish_routine()
+            save_routines()
+    
     status = routine.get_status_display()
     
     buttons = []
@@ -1323,6 +1333,21 @@ async def action_over_time(current_time) -> None:
             user_time = datetime.datetime.now(user_tz)
             today = user_time.date().isoformat()
             
+            # AUTO-CLEANUP: Force finish any ongoing routine after window closes (for the bug with the bot not finished routine at all)
+            if user_time.hour == routine.window_end and user_time.minute == 0:
+                if routine.routine_started:
+                    # Force finish the routine with current completion
+                    routine.finish_routine()
+                    save_routines()
+                    
+                    completion = routine.get_completion_percentage()
+                    if completion < 100:
+                        await bot.send_message(
+                            chat_id,
+                            f"*Routine auto-finished*\n\n`{completion:.0f}% complete`\nStreak reset\\.",
+                            disable_notification=True
+                        )
+            
             # Morning reminder - at window start (SILENT)
             if user_time.hour == routine.window_start and user_time.minute == 0:
                 if today not in routine.history:
@@ -1332,7 +1357,7 @@ async def action_over_time(current_time) -> None:
                         disable_notification=True
                     )
             
-           # Warning - 1 hour before window ends (SILENT)
+            # Warning - 1 hour before window ends (SILENT)
             elif user_time.hour == (routine.window_end - 2) and user_time.minute == 0:
                 if today not in routine.history:
                     hours_left = routine.window_end - user_time.hour
@@ -1341,6 +1366,7 @@ async def action_over_time(current_time) -> None:
                         f"*⏰ {hours_left} hour{'s' if hours_left != 1 else ''} left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
                         disable_notification=True
                     )
+            
             # Check for missed routines - 30 minutes after window ends
             elif user_time.hour == routine.window_end and user_time.minute == 30:
                 routine.check_missed_routine()
