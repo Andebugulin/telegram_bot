@@ -230,31 +230,40 @@ async def show_main_menu(chat_id: int, state: FSMContext):
     await state.set_state(StepsForm.MENU)
     routine = routines_dict[chat_id]
     
-    # SAFETY: If routine is started but window is closed, force finish it (routine continuation bug)
-    if routine.routine_started and not routine.can_start_routine():
-        user_tz = pytz.timezone(routine.timezone)
-        now = datetime.datetime.now(user_tz)
-        
-        # If we're past the window end, force finish
-        if now.hour >= routine.window_end:
+    # Get current time in user's timezone
+    user_tz = pytz.timezone(routine.timezone)
+    now = datetime.datetime.now(user_tz)
+    current_minutes = now.hour * 60 + now.minute
+    start_minutes = routine.window_start * 60 + routine.window_start_minute
+    end_minutes = routine.window_end * 60 + routine.window_end_minute
+    
+    # CRITICAL: If outside window and routine started, force finish
+    if current_minutes >= end_minutes:
+        if routine.routine_started:
             routine.finish_routine()
             save_routines()
+            
+            completion = routine.get_completion_percentage()
+            await bot.send_message(
+                chat_id,
+                f"*Window closed*\n\n`{completion:.0f}% complete`\n{'Streak maintained' if completion >= 100 else 'Streak reset'}",
+            )
     
     status = routine.get_status_display()
-    
     buttons = []
     
-    if routine.can_start_routine() and not routine.routine_started:
-        buttons.append([KeyboardButton(text="Start Routine")])
-    elif routine.routine_started:
-        buttons.append([KeyboardButton(text="Continue")])
+    # ONLY show start/continue if IN window
+    if current_minutes >= start_minutes and current_minutes < end_minutes:
+        if not routine.routine_started:
+            buttons.append([KeyboardButton(text="Start Routine")])
+        else:
+            buttons.append([KeyboardButton(text="Continue")])
     
     buttons.extend([
         [KeyboardButton(text="Stats"), KeyboardButton(text="Settings")]
     ])
     
     markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
-    
     await bot.send_message(chat_id, status, reply_markup=markup)
 
 @dp.message(StepsForm.MENU, F.text == "Start Routine")
@@ -262,21 +271,25 @@ async def start_routine(message: types.Message, state: FSMContext):
     chat_id = message.from_user.id
     routine = routines_dict[chat_id]
     
+    print(f"\n[START ROUTINE] Called by {chat_id}")
+    
     if not routine.can_start_routine():
-        now = datetime.datetime.now()
+        user_tz = pytz.timezone(routine.timezone)
+        now = datetime.datetime.now(user_tz)
+        print(f"[START ROUTINE] Cannot start - outside window")
         await bot.send_message(
             chat_id,
-            f"`Routine window: 05:00 \\- 11:00`\n`Now: {now.strftime('%H:%M')}`"
+            f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
         )
         return
     
     if routine.start_routine():
+        print(f"[START ROUTINE] Success - starting tasks")
         await state.set_state(StepsForm.ROUTINE_ACTIVE)
         save_routines()
-        
-        # Send first task automatically
         await send_next_task(chat_id, state)
     else:
+        print(f"[START ROUTINE] Failed")
         await bot.send_message(chat_id, "`Could not start routine`")
 
 
@@ -291,7 +304,21 @@ async def send_next_task(chat_id: int, state: FSMContext):
     """Send next uncompleted task - watch-friendly"""
     routine = routines_dict[chat_id]
     
-   # Find next uncompleted AND not skipped task
+    # CHECK IF STILL IN WINDOW
+    user_tz = pytz.timezone(routine.timezone)
+    now = datetime.datetime.now(user_tz)
+    current_minutes = now.hour * 60 + now.minute
+    end_minutes = routine.window_end * 60 + routine.window_end_minute
+    
+    if current_minutes >= end_minutes:
+        # Window closed! Force finish
+        routine.finish_routine()
+        save_routines()
+        await bot.send_message(chat_id, "*Window closed*\n\nRoutine finished\\.")
+        await show_main_menu(chat_id, state)
+        return
+    
+    # Find next uncompleted AND not skipped task
     next_task = None
     task_num = None
     for i, task in enumerate(routine.tasks):
@@ -303,35 +330,36 @@ async def send_next_task(chat_id: int, state: FSMContext):
     if next_task:
         await state.set_state(StepsForm.ROUTINE_ACTIVE_WAITING)
         
-        # Count remaining
-        remaining = sum(1 for t in routine.tasks if not t.completed)
-        completion = routine.get_completion_percentage()
+        # Calculate based on ALL tasks (not just required)
+        total_tasks = len(routine.tasks)
+        completed_tasks = sum(1 for t in routine.tasks if t.completed)
+        skipped_tasks = sum(1 for t in routine.tasks if t.skipped)
+        remaining = total_tasks - completed_tasks - skipped_tasks
+        completion = ((completed_tasks + skipped_tasks) / total_tasks) * 100 if total_tasks > 0 else 0
         
         opt_label = " `opt`" if next_task.optional else ""
+        notes_text = f"\n_{next_task.notes}_\n" if next_task.notes else "\n"
         
-        # Progress bar
-        total_tasks = len([t for t in routine.tasks if not t.optional])
-        completed_tasks = total_tasks - remaining
-        progress_bar = make_progress_bar((completed_tasks / total_tasks) * 100, 20)
+        # Progress bar based on completion percentage
+        progress_bar = make_progress_bar(completion, 20)
         
         text = make_header(f"TASK {task_num}") + f"""
 *{next_task.name}*
 `{next_task.duration} minutes`{opt_label}
-
+{notes_text}
 {progress_bar}
 `{completion:.0f}%` · `{remaining} left`
 """
         
-        # Create quick reply buttons
         replies = user_replies.get(chat_id, DEFAULT_REPLIES)
         buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
-        buttons.append([KeyboardButton(text="Skip"), KeyboardButton(text="Menu")])
+        buttons.append([KeyboardButton(text="Skip")])
+        buttons.append([KeyboardButton(text="Menu")])
         
         markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
         
         await bot.send_message(chat_id, text, reply_markup=markup, disable_notification=True)
     else:
-        # All tasks done
         await finish_routine_confirmed(chat_id, state)
 
 @dp.message(StepsForm.ROUTINE_ACTIVE_WAITING)
@@ -976,21 +1004,21 @@ async def customize_window(message: types.Message, state: FSMContext):
     
     text = make_header("TIME WINDOW") + f"""
 *Current:*
-`{routine.window_start:02d}:00 - {routine.window_end:02d}:00`
+`{routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`
 
 {SEPARATOR_LIGHT}
 
 *Change window:*
-`window 6 12` (6 AM - 12 PM)
-`window 5 10` (5 AM - 10 AM)
+`window 6 12` (6:00 AM - 12:00 PM)
+`window 6:30 12:45` (6:30 AM - 12:45 PM)
 
-Hours: 0-23
+Hours: 0-23, Minutes: 0-59
 """
     
     markup = ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
-            [KeyboardButton(text="window 6 12")],
+            [KeyboardButton(text="window 6:30 12")],
             [KeyboardButton(text="Back")]
         ]
     )
@@ -1011,24 +1039,57 @@ async def handle_window_change(message: types.Message, state: FSMContext):
     parts = text.split()
     if len(parts) == 3 and parts[0] == "window":
         try:
-            start = int(parts[1])
-            end = int(parts[2])
-            
-            if 0 <= start < 24 and 0 <= end <= 24 and start < end:
-                routine.window_start = start
-                routine.window_end = end
-                save_routines()
-                await bot.send_message(
-                    chat_id, 
-                    f"`Window: {start:02d}:00 - {end:02d}:00`"
-                )
-                await show_settings(message, state)
+            # Parse start time
+            if ':' in parts[1]:
+                start_parts = parts[1].split(':')
+                start_hour = int(start_parts[0])
+                start_minute = int(start_parts[1])
             else:
-                await bot.send_message(chat_id, "`Invalid hours (0-23, start < end)`")
-        except ValueError:
+                start_hour = int(parts[1])
+                start_minute = 0
+            
+            # Parse end time
+            if ':' in parts[2]:
+                end_parts = parts[2].split(':')
+                end_hour = int(end_parts[0])
+                end_minute = int(end_parts[1])
+            else:
+                end_hour = int(parts[2])
+                end_minute = 0
+            
+            # Validate
+            if not (0 <= start_hour < 24 and 0 <= start_minute < 60):
+                await bot.send_message(chat_id, "`Invalid start time`")
+                return
+            
+            if not (0 <= end_hour <= 24 and 0 <= end_minute < 60):
+                await bot.send_message(chat_id, "`Invalid end time`")
+                return
+            
+            # Compare as total minutes
+            start_total = start_hour * 60 + start_minute
+            end_total = end_hour * 60 + end_minute
+            
+            if start_total >= end_total:
+                await bot.send_message(chat_id, "`Start must be before end`")
+                return
+            
+            routine.window_start = start_hour
+            routine.window_start_minute = start_minute
+            routine.window_end = end_hour
+            routine.window_end_minute = end_minute
+            save_routines()
+            
+            await bot.send_message(
+                chat_id, 
+                f"`Window: {start_hour:02d}:{start_minute:02d} - {end_hour:02d}:{end_minute:02d}`"
+            )
+            await show_settings(message, state)
+            
+        except (ValueError, IndexError):
             await bot.send_message(chat_id, "`Invalid format`")
     else:
-        await bot.send_message(chat_id, "`Format: window START END`")
+        await bot.send_message(chat_id, "`Format: window START END`\n`Example: window 6:30 12:45`")
 
 
 # Update settings menu to include new options:
@@ -1298,29 +1359,49 @@ async def handle_menu_fallback(message: types.Message, state: FSMContext):
         await bot.send_message(chat_id, "`Cannot start with Skip`")
         return
     
+    # Check if we're in the time window
+    user_tz = pytz.timezone(routine.timezone)
+    now = datetime.datetime.now(user_tz)
+    current_minutes = now.hour * 60 + now.minute
+    start_minutes = routine.window_start * 60 + routine.window_start_minute
+    end_minutes = routine.window_end * 60 + routine.window_end_minute
+    
+    # If outside window, show menu
+    if current_minutes < start_minutes or current_minutes >= end_minutes:
+        await bot.send_message(
+            chat_id,
+            f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
+        )
+        await show_main_menu(chat_id, state)
+        return
+    
     # ANY other text should start the routine if conditions are met
     if routine.can_start_routine() and not routine.routine_started:
         if routine.start_routine():
+            print(f"[WATCH START] Starting routine from watch input: '{text}'")
             await state.set_state(StepsForm.ROUTINE_ACTIVE)
             save_routines()
             await send_next_task(chat_id, state)
         else:
-            now = datetime.datetime.now()
             await bot.send_message(
                 chat_id,
-                f"`Routine window: 05:00 \\- 11:00`\n`Now: {now.strftime('%H:%M')}`"
+                f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
             )
     elif routine.routine_started:
         # If routine already started, go to continue
+        print(f"[WATCH CONTINUE] Continuing from watch input: '{text}'")
         await state.set_state(StepsForm.ROUTINE_ACTIVE)
         await send_next_task(chat_id, state)
     else:
         # Unknown situation, show menu
         await show_main_menu(chat_id, state)
 
-async def action_over_time(current_time) -> None:
+async def action_over_time(current_time, last_sent=None) -> None:
     """Scheduled tasks that run at specific times"""
     global routines_dict
+    
+    if last_sent is None:
+        last_sent = {}
     
     # Check notifications for each user in their timezone
     for chat_id, routine in list(routines_dict.items()):
@@ -1328,15 +1409,27 @@ async def action_over_time(current_time) -> None:
             continue
         
         try:
+            # Initialize tracking for this user
+            if chat_id not in last_sent:
+                last_sent[chat_id] = {}
+            
             # Get current time in user's timezone
             user_tz = pytz.timezone(routine.timezone)
             user_time = datetime.datetime.now(user_tz)
             today = user_time.date().isoformat()
+            current_time_str = user_time.strftime('%Y-%m-%d %H:%M')
             
-            # AUTO-CLEANUP: Force finish any ongoing routine after window closes (for the bug with the bot not finished routine at all)
-            if user_time.hour == routine.window_end and user_time.minute == 0:
-                if routine.routine_started:
-                    # Force finish the routine with current completion
+            current_minutes = user_time.hour * 60 + user_time.minute
+            start_minutes = routine.window_start * 60 + routine.window_start_minute
+            end_minutes = routine.window_end * 60 + routine.window_end_minute
+            
+            print(f"[DEBUG {chat_id}] Current: {user_time.strftime('%H:%M')}, Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}")
+            
+            # AUTO-CLEANUP: Force finish any ongoing routine after window closes
+            if current_minutes >= end_minutes and routine.routine_started:
+                finish_key = f'finish_{today}'
+                if last_sent[chat_id].get(finish_key) != current_time_str:
+                    print(f"[DEBUG {chat_id}] Auto-finishing routine")
                     routine.finish_routine()
                     save_routines()
                     
@@ -1347,56 +1440,76 @@ async def action_over_time(current_time) -> None:
                             f"*Routine auto-finished*\n\n`{completion:.0f}% complete`\nStreak reset\\.",
                             disable_notification=True
                         )
+                    last_sent[chat_id][finish_key] = current_time_str
             
             # Morning reminder - at window start (SILENT)
-            if user_time.hour == routine.window_start and user_time.minute == 0:
-                if today not in routine.history:
+            if current_minutes == start_minutes:
+                start_key = f'start_{today}'
+                if today not in routine.history and last_sent[chat_id].get(start_key) != current_time_str:
+                    print(f"[DEBUG {chat_id}] Sending morning reminder")
                     await bot.send_message(
                         chat_id,
                         make_header("Good morning") + "Ready to start?",
                         disable_notification=True
                     )
+                    last_sent[chat_id][start_key] = current_time_str
             
             # Warning - 1 hour before window ends (SILENT)
-            elif user_time.hour == (routine.window_end - 2) and user_time.minute == 0:
-                if today not in routine.history:
-                    hours_left = routine.window_end - user_time.hour
-                    await bot.send_message(
-                        chat_id,
-                        f"*⏰ {hours_left} hour{'s' if hours_left != 1 else ''} left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
-                        disable_notification=True
-                    )
+            warning_minutes = end_minutes - 60
+            if warning_minutes > 0 and current_minutes == warning_minutes:
+                warning_key = f'warning_{today}'
+                if today not in routine.history and last_sent[chat_id].get(warning_key) != current_time_str:
+                    minutes_left = end_minutes - current_minutes
+                    hours_left = minutes_left // 60
+                    if hours_left > 0:
+                        print(f"[DEBUG {chat_id}] Sending warning")
+                        await bot.send_message(
+                            chat_id,
+                            f"*⏰ ~{hours_left} hour{'s' if hours_left != 1 else ''} left*\n\n`{routine.current_streak}d` {ICON_STREAK}",
+                            disable_notification=True
+                        )
+                        last_sent[chat_id][warning_key] = current_time_str
             
             # Check for missed routines - 30 minutes after window ends
-            elif user_time.hour == routine.window_end and user_time.minute == 30:
-                routine.check_missed_routine()
-                
-                if routine.history.get(today, {}).get('missed', False):
-                    await bot.send_message(
-                        chat_id,
-                        "*Window closed*\n\nStreak reset\\. Tomorrow is fresh\\.",
-                        disable_notification=True
-                    )
-                save_routines()
+            missed_check_minutes = end_minutes + 30
+            if current_minutes == missed_check_minutes:
+                missed_key = f'missed_{today}'
+                if last_sent[chat_id].get(missed_key) != current_time_str:
+                    routine.check_missed_routine()
+                    
+                    if routine.history.get(today, {}).get('missed', False):
+                        print(f"[DEBUG {chat_id}] Sending missed notification")
+                        await bot.send_message(
+                            chat_id,
+                            "*Window closed*\n\nStreak reset\\. Tomorrow is fresh\\.",
+                            disable_notification=True
+                        )
+                    save_routines()
+                    last_sent[chat_id][missed_key] = current_time_str
             
             # Evening success message - 9:00 PM (SILENT)
             elif user_time.hour == 21 and user_time.minute == 0:
-                day_data = routine.history.get(today, {})
-                
-                if day_data.get('completion', 0) >= 100:
-                    streak_bar = make_streak_bar(routine.current_streak, 10)
-                    await bot.send_message(
-                        chat_id,
-                        make_header("Great day!") + f"\n{streak_bar}\n`{routine.current_streak}d`",
-                        disable_notification=True
-                    )
+                evening_key = f'evening_{today}'
+                if last_sent[chat_id].get(evening_key) != current_time_str:
+                    day_data = routine.history.get(today, {})
+                    
+                    if day_data.get('completion', 0) >= 100:
+                        streak_bar = make_streak_bar(routine.current_streak, 10)
+                        await bot.send_message(
+                            chat_id,
+                            make_header("Great day!") + f"\n{streak_bar}\n`{routine.current_streak}d`",
+                            disable_notification=True
+                        )
+                        last_sent[chat_id][evening_key] = current_time_str
             
             # Weekly report - Sunday 8:00 PM (SILENT)
             elif user_time.weekday() == 6 and user_time.hour == 20 and user_time.minute == 0:
-                stats = routine.get_weekly_stats()
-                visual = create_week_visual(routine)
-                
-                report = f"""*WEEK COMPLETE*
+                weekly_key = f'weekly_{today}'
+                if last_sent[chat_id].get(weekly_key) != current_time_str:
+                    stats = routine.get_weekly_stats()
+                    visual = create_week_visual(routine)
+                    
+                    report = f"""*WEEK COMPLETE*
 
 {visual}
 
@@ -1406,22 +1519,88 @@ async def action_over_time(current_time) -> None:
 `{stats['best_streak']}d` best
 
 {get_weekly_insights(stats)}"""
-                
-                await bot.send_message(chat_id, report, disable_notification=True)
+                    
+                    await bot.send_message(chat_id, report, disable_notification=True)
+                    last_sent[chat_id][weekly_key] = current_time_str
         
         except Exception as e:
+            print(f"[ERROR] {chat_id}: {e}")
             if 'blocked' in str(e).lower():
                 del routines_dict[chat_id]
                 print(f"Removed blocked user: {chat_id}")
 
-async def scheduled_messages(task_dictionary:dict):
+async def scheduled_messages(task_dictionary=None):
+    """Background task for scheduled notifications"""
+    print("\n SCHEDULED MESSAGES TASK IS RUNNING \n")
+    
+    loop_count = 0
+    last_notified = {}
+    
     while True:
-        # current time
-        current_time = datetime.datetime.now()
+        try:
+            loop_count += 1
+            now = datetime.datetime.now()
+            
+            print(f"\n[LOOP {loop_count}] Checking at {now.strftime('%H:%M:%S')}")
+            
+            for chat_id, routine in list(routines_dict.items()):
+                if not routine.is_setup_complete:
+                    continue
+                
+                try:
+                    user_tz = pytz.timezone(routine.timezone)
+                    user_time = datetime.datetime.now(user_tz)
+                    today = user_time.date().isoformat()
+                    
+                    current_minutes = user_time.hour * 60 + user_time.minute
+                    start_minutes = routine.window_start * 60 + routine.window_start_minute
+                    end_minutes = routine.window_end * 60 + routine.window_end_minute
+                    
+                    print(f"  - Chat {chat_id}: {user_time.strftime('%H:%M')} | Window: {routine.window_start:02d}:{routine.window_start_minute:02d}-{routine.window_end:02d}:{routine.window_end_minute:02d} | Started: {routine.routine_started}")
+                    
+                    if chat_id not in last_notified:
+                        last_notified[chat_id] = {}
+                    
+                    # START NOTIFICATION
+                    if (start_minutes <= current_minutes < end_minutes and 
+                        not routine.routine_started and 
+                        today not in routine.history and
+                        last_notified[chat_id].get('start') != today):
+                        
+                        print(f"    → Sending start notification")
+                        await bot.send_message(
+                            chat_id,
+                            make_header("Good morning") + "Ready to start?",
+                            disable_notification=True
+                        )
+                        last_notified[chat_id]['start'] = today
+                    
+                    # END NOTIFICATION
+                    if current_minutes >= end_minutes and routine.routine_started:
+                        print(f"    → Window closed, finishing routine")
+                        routine.finish_routine()
+                        save_routines()
+                        
+                        completion = routine.get_completion_percentage()
+                        await bot.send_message(
+                            chat_id,
+                            f"*Window closed*\n\n`{completion:.0f}% complete`\n{'Streak maintained' if completion >= 100 else 'Streak reset'}",
+                            disable_notification=True
+                        )
+                        last_notified[chat_id]['end'] = today
+                    
+                except Exception as e:
+                    print(f"    ✗ ERROR: {e}")
+                    import traceback
+                    traceback.print_exc()
+            
+            print(f"[LOOP {loop_count}] Sleeping 60s\n")
+            
+        except Exception as e:
+            print(f"\n!!! LOOP ERROR: {e}")
+            import traceback
+            traceback.print_exc()
         
-        await action_over_time(current_time) # perform actions at a specific time.
-
-        # Sleep for a minute and check again
         await asyncio.sleep(60)
 
 def save_routines() -> None:
@@ -1473,29 +1652,27 @@ def load_routines() -> dict:
         return {}
 
 async def main() -> None:
+    global FILE_NAME, routines_dict
+    
+    FILE_NAME = './routines_data.json'
+    routines_dict = load_routines()
+    
+    print(f"\n{'='*50}")
+    print(f"BOT STARTING")
+    print(f"Loaded {len(routines_dict)} users")
+    print(f"{'='*50}\n")
+    
+    # Create the scheduled task
+    scheduled_task = asyncio.create_task(scheduled_messages())
+    print("✓ Scheduled notifications task created")
+    
     try:
-        global FILE_NAME, routines_dict
-        
-        FILE_NAME = './routines_data.json'
-        routines_dict = load_routines()
-        
-        print(f"Bot starting with {len(routines_dict)} existing users")
-        
-        # Start scheduled messages
-        asyncio.create_task(scheduled_messages())
-        
+        # Start polling
+        print("✓ Starting bot polling...")
         await dp.start_polling(bot)
     finally:
+        scheduled_task.cancel()
         save_routines()
         await bot.session.close()
-
-
-async def scheduled_messages():
-    """Background task for scheduled notifications"""
-    while True:
-        current_time = datetime.datetime.now()
-        await action_over_time(current_time)
-        await asyncio.sleep(60)  # Check every minute
-
 if __name__ == "__main__":
     asyncio.run(main())

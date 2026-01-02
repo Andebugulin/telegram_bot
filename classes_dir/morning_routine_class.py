@@ -56,10 +56,12 @@ class MorningRoutine:
         self.paused = False
         self.pause_time = None
         self.total_pause_duration = 0
-        # Customizable time window (hours)
+        # Customizable time window (hours and minutes)
         self.window_start = 5
+        self.window_start_minute = 0  # NEW
         self.window_end = 11
-        self.timezone = 'Europe/Helsinki'  # Default timezone
+        self.window_end_minute = 0    # NEW
+        self.timezone = 'Europe/Helsinki'
     
     def add_task(self, name: str, duration: int, optional: bool = False, notes: str = "") -> tuple[bool, str]:
         """Add task with validation. Returns (success, error_message)"""
@@ -130,7 +132,6 @@ class MorningRoutine:
     
     def can_start_routine(self) -> bool:
         """Check if within time window and not already done today"""
-        # Use user's timezone
         user_tz = pytz.timezone(self.timezone)
         now = datetime.datetime.now(user_tz)
         today = now.date().isoformat()
@@ -139,8 +140,12 @@ class MorningRoutine:
         if today in self.history:
             return False
         
-        # Check time window
-        return self.window_start <= now.hour < self.window_end
+        # Check time window with minutes
+        current_minutes = now.hour * 60 + now.minute
+        start_minutes = self.window_start * 60 + self.window_start_minute
+        end_minutes = self.window_end * 60 + self.window_end_minute
+        
+        return start_minutes <= current_minutes < end_minutes
     
     def pause_routine(self):
         """Pause routine"""
@@ -217,7 +222,11 @@ class MorningRoutine:
         now = datetime.datetime.now(user_tz)
         today = now.date().isoformat()
         
-        if now.hour >= self.window_end and today not in self.history:
+        # Check if past window end
+        current_minutes = now.hour * 60 + now.minute
+        end_minutes = self.window_end * 60 + self.window_end_minute
+        
+        if current_minutes >= end_minutes and today not in self.history:
             self.history[today] = {
                 'completion': 0,
                 'duration': 0,
@@ -225,6 +234,11 @@ class MorningRoutine:
                 'missed': True
             }
             self.current_streak = 0
+            # Reset tasks for next day
+            for task in self.tasks:
+                task.reset()
+            self.routine_started = False
+            self.start_time = None
     
     def get_weekly_stats(self):
         last_7_days = []
@@ -298,10 +312,12 @@ class MorningRoutine:
             'pause_time': self.pause_time.isoformat() if self.pause_time else None,
             'total_pause_duration': self.total_pause_duration,
             'window_start': self.window_start,
+            'window_start_minute': self.window_start_minute,  # NEW
             'window_end': self.window_end,
+            'window_end_minute': self.window_end_minute,      # NEW
             'timezone': self.timezone
         }
-    
+
     @classmethod
     def from_dict(cls, data):
         routine = cls(data['chat_id'])
@@ -319,6 +335,8 @@ class MorningRoutine:
             routine.pause_time = datetime.datetime.fromisoformat(data['pause_time'])
         routine.total_pause_duration = data.get('total_pause_duration', 0)
         routine.window_start = data.get('window_start', 5)
+        routine.window_start_minute = data.get('window_start_minute', 0)  # NEW
         routine.window_end = data.get('window_end', 11)
+        routine.window_end_minute = data.get('window_end_minute', 0)      # NEW
         routine.timezone = data.get('timezone', 'Europe/Helsinki')
         return routine
