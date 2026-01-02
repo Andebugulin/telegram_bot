@@ -201,8 +201,15 @@ class MorningRoutine:
         else:
             self.current_streak = 0
         
+        for task in self.tasks:
+            task.reset()
+        
         self.routine_started = False
+        self.start_time = None  # Also reset start_time
         self.paused = False
+        self.pause_time = None
+        self.total_pause_duration = 0
+        
         return True
     
     def check_missed_routine(self):
