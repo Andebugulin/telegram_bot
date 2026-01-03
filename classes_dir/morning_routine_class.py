@@ -184,6 +184,7 @@ class MorningRoutine:
         if not self.routine_started:
             return False
         
+        # Calculate completion BEFORE resetting anything
         completion = self.get_completion_percentage()
         
         # Calculate actual duration (excluding pauses)
@@ -191,10 +192,12 @@ class MorningRoutine:
         active_duration = (total_seconds - self.total_pause_duration) / 60
         
         today = datetime.date.today().isoformat()
+        
+        # Save history with CURRENT task states (before reset)
         self.history[today] = {
             'completion': completion,
             'duration': int(active_duration),
-            'tasks': [t.to_dict() for t in self.tasks]
+            'tasks': [t.to_dict() for t in self.tasks]  # Save current state
         }
         
         # Streak: 100% = maintain, else reset
@@ -206,11 +209,12 @@ class MorningRoutine:
         else:
             self.current_streak = 0
         
+        # NOW reset tasks for next day (AFTER history is saved)
         for task in self.tasks:
             task.reset()
         
         self.routine_started = False
-        self.start_time = None  # Also reset start_time
+        self.start_time = None
         self.paused = False
         self.pause_time = None
         self.total_pause_duration = 0

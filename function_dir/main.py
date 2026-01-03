@@ -304,17 +304,19 @@ async def send_next_task(chat_id: int, state: FSMContext):
     """Send next uncompleted task - watch-friendly"""
     routine = routines_dict[chat_id]
     
-    # CHECK IF STILL IN WINDOW
+    # CHECK IF STILL IN WINDOW - CRITICAL CHECK
     user_tz = pytz.timezone(routine.timezone)
     now = datetime.datetime.now(user_tz)
     current_minutes = now.hour * 60 + now.minute
+    start_minutes = routine.window_start * 60 + routine.window_start_minute
     end_minutes = routine.window_end * 60 + routine.window_end_minute
     
-    if current_minutes >= end_minutes:
-        # Window closed! Force finish
-        routine.finish_routine()
-        save_routines()
-        await bot.send_message(chat_id, "*Window closed*\n\nRoutine finished\\.")
+    # If outside window, force finish and block
+    if current_minutes < start_minutes or current_minutes >= end_minutes:
+        if routine.routine_started:
+            routine.finish_routine()
+            save_routines()
+            await bot.send_message(chat_id, "*Window closed*\n\nRoutine finished\\.")
         await show_main_menu(chat_id, state)
         return
     
@@ -368,12 +370,25 @@ async def handle_task_response(message: types.Message, state: FSMContext):
     routine = routines_dict[chat_id]
     text = message.text.strip()
     
+    # CHECK WINDOW FIRST
+    user_tz = pytz.timezone(routine.timezone)
+    now = datetime.datetime.now(user_tz)
+    current_minutes = now.hour * 60 + now.minute
+    start_minutes = routine.window_start * 60 + routine.window_start_minute
+    end_minutes = routine.window_end * 60 + routine.window_end_minute
+    
+    # Block if outside window
+    if current_minutes < start_minutes or current_minutes >= end_minutes:
+        await bot.send_message(chat_id, "*Window closed*")
+        await show_main_menu(chat_id, state)
+        return
+    
     if text == "Menu":
         await show_main_menu(chat_id, state)
         return
     
     if text == "Skip":
-        # Mark current task as skipped (counts as failed)
+        # Mark current task as skipped
         for i, task in enumerate(routine.tasks):
             if not task.completed and not task.skipped:
                 task.skipped = True
@@ -384,14 +399,12 @@ async def handle_task_response(message: types.Message, state: FSMContext):
         return
     
     # Any other response = task completed
-    # Find current uncompleted task
     for i, task in enumerate(routine.tasks):
         if not task.completed and not task.skipped:
             routine.complete_task(i)
             save_routines()
             break
     
-    # Send next task
     await send_next_task(chat_id, state)
 
 
@@ -1578,13 +1591,16 @@ async def scheduled_messages(task_dictionary=None):
                     # END NOTIFICATION
                     if current_minutes >= end_minutes and routine.routine_started:
                         print(f"    → Window closed, finishing routine")
+                        
+                        # Get completion BEFORE finishing
+                        completion_before = routine.get_completion_percentage()
+                        
                         routine.finish_routine()
                         save_routines()
                         
-                        completion = routine.get_completion_percentage()
                         await bot.send_message(
                             chat_id,
-                            f"*Window closed*\n\n`{completion:.0f}% complete`\n{'Streak maintained' if completion >= 100 else 'Streak reset'}",
+                            f"*Window closed*\n\n`{completion_before:.0f}% complete`\n{'Streak maintained' if completion_before >= 100 else 'Streak reset'}",
                             disable_notification=True
                         )
                         last_notified[chat_id]['end'] = today
