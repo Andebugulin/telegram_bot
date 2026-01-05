@@ -1353,23 +1353,31 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
     # Schedule the message to be sent daily at 12:00
     asyncio.create_task(scheduled_messages(task_dictionary))
 
-@dp.message(StepsForm.MENU)
-async def handle_menu_fallback(message: types.Message, state: FSMContext):
-    """Catch-all for menu - handles watch quick replies"""
+# Add this handler BEFORE handle_menu_fallback
+# This catches ANY message when setup is complete and routine can start
+@dp.message(lambda message: message.from_user.id in routines_dict and 
+                           routines_dict[message.from_user.id].is_setup_complete and
+                           message.text not in ["Stats", "Settings", "Menu", "Back", "Cancel"])
+async def catch_all_start_routine(message: types.Message, state: FSMContext):
+    """Catch responses to 'Ready to start?' notification from any state"""
     chat_id = message.from_user.id
     routine = routines_dict[chat_id]
     text = message.text.strip()
     
-    # List of known button commands that should be ignored here
-    known_commands = ["Start Routine", "Continue", "Stats", "Settings"]
+    # Get current state
+    current_state = await state.get_state()
     
-    # If it's a known command, ignore it (other handlers will catch it)
-    if text in known_commands:
-        return
-    
-    # Check if text is "Skip" - never start routine with this
-    if text == "Skip":
-        await bot.send_message(chat_id, "`Cannot start with Skip`")
+    # Skip if we're in specific flows that need their own handlers
+    if current_state in [
+        StepsForm.ROUTINE_ACTIVE_WAITING,
+        StepsForm.SETUP_ADD_TASK,
+        StepsForm.SETUP_INTRO,
+        StepsForm.SETTINGS_EDIT_ROUTINE,
+        StepsForm.SETTINGS_EDIT_TASK,
+        StepsForm.SETTINGS_EDIT_WINDOW,
+        StepsForm.SETTINGS_EDIT_TIMEZONE,
+        StepsForm.SETTINGS_CUSTOMIZE_REPLIES
+    ]:
         return
     
     # Check if we're in the time window
@@ -1379,19 +1387,23 @@ async def handle_menu_fallback(message: types.Message, state: FSMContext):
     start_minutes = routine.window_start * 60 + routine.window_start_minute
     end_minutes = routine.window_end * 60 + routine.window_end_minute
     
-    # If outside window, show menu
+    # If outside window, ignore
     if current_minutes < start_minutes or current_minutes >= end_minutes:
-        await bot.send_message(
-            chat_id,
-            f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
-        )
-        await show_main_menu(chat_id, state)
         return
     
-    # ANY other text should start the routine if conditions are met
-    if routine.can_start_routine() and not routine.routine_started:
+    # If text is "Skip", ignore
+    if text == "Skip":
+        return
+    
+    # If routine already started, continue it
+    if routine.routine_started:
+        print(f"[CATCH-ALL CONTINUE] Continuing from: '{text}'")
+        await state.set_state(StepsForm.ROUTINE_ACTIVE)
+        await send_next_task(chat_id, state)
+    # If routine can start, start it
+    elif routine.can_start_routine():
         if routine.start_routine():
-            print(f"[WATCH START] Starting routine from watch input: '{text}'")
+            print(f"[CATCH-ALL START] Starting routine from: '{text}'")
             await state.set_state(StepsForm.ROUTINE_ACTIVE)
             save_routines()
             await send_next_task(chat_id, state)
@@ -1400,14 +1412,25 @@ async def handle_menu_fallback(message: types.Message, state: FSMContext):
                 chat_id,
                 f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
             )
-    elif routine.routine_started:
-        # If routine already started, go to continue
-        print(f"[WATCH CONTINUE] Continuing from watch input: '{text}'")
-        await state.set_state(StepsForm.ROUTINE_ACTIVE)
-        await send_next_task(chat_id, state)
-    else:
-        # Unknown situation, show menu
-        await show_main_menu(chat_id, state)
+
+
+# Keep the existing handle_menu_fallback but simplify it
+@dp.message(StepsForm.MENU)
+async def handle_menu_fallback(message: types.Message, state: FSMContext):
+    """Catch-all for MENU state specifically"""
+    chat_id = message.from_user.id
+    text = message.text.strip()
+    
+    # List of known button commands that other handlers catch
+    known_commands = ["Start Routine", "Continue", "Stats", "Settings"]
+    
+    # If it's a known command, let other handlers process it
+    if text in known_commands:
+        return
+    
+    # For any other text in MENU state, the catch_all_start_routine handler 
+    # will have already processed it, so just show menu again
+    await show_main_menu(chat_id, state)
 
 async def action_over_time(current_time, last_sent=None) -> None:
     """Scheduled tasks that run at specific times"""
