@@ -422,10 +422,12 @@ async def handle_routine_action(message: types.Message, state: FSMContext):
 
 async def finish_routine_confirmed(chat_id: int, state: FSMContext):
     routine = routines_dict[chat_id]
+    
+    # Get completion BEFORE finishing
+    completion = routine.get_completion_percentage()
+    
     routine.finish_routine()
     save_routines()
-    
-    completion = routine.get_completion_percentage()
     
     if completion >= 100:
         progress_bar = make_progress_bar(completion, 20)
@@ -1466,14 +1468,17 @@ async def action_over_time(current_time, last_sent=None) -> None:
                 finish_key = f'finish_{today}'
                 if last_sent[chat_id].get(finish_key) != current_time_str:
                     print(f"[DEBUG {chat_id}] Auto-finishing routine")
+                    
+                    # Get completion BEFORE finishing
+                    completion = routine.get_completion_percentage()
+                    
                     routine.finish_routine()
                     save_routines()
                     
-                    completion = routine.get_completion_percentage()
                     if completion < 100:
                         await bot.send_message(
                             chat_id,
-                            f"*Routine auto-finished*\n\n`{completion:.0f}% complete`\nStreak reset\\.",
+                            f"*Window closed*\n\n`{completion:.0f}% complete`\n{'Streak maintained' if completion >= 100 else 'Streak reset'}",
                             disable_notification=True
                         )
                     last_sent[chat_id][finish_key] = current_time_str
