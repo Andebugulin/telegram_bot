@@ -315,13 +315,25 @@ class MorningRoutine:
         else:
             max_name_length = 0
         
+        # Calculate estimated time slots
+        cursor = self.window_start * 60 + self.window_start_minute
+        
         for i, task in enumerate(self.tasks, 1):
             status = "✓" if task.completed else "○"
             opt = " `opt`" if task.optional else ""
             padding = max_name_length - len(task.name)
             spaces = "\u2009" * padding
             
-            lines.append(f"{status} `{task.name}{spaces}  {task.duration}m`{opt}\n")
+            # Time range
+            start_h, start_m = divmod(cursor, 60)
+            end_cursor = cursor + task.duration
+            end_h, end_m = divmod(end_cursor, 60)
+            time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+            
+            lines.append(f"{status} `{task.name}{spaces}  {task.duration}m  {time_range}`{opt}\n")
+            
+            # Next task starts after this task + buffer (no buffer before first task)
+            cursor = end_cursor + self.buffer_minutes
         
         if self.routine_started:
             completion = self.get_completion_percentage()
