@@ -62,6 +62,15 @@ class MorningRoutine:
         self.window_end = 11
         self.window_end_minute = 0    # NEW
         self.timezone = 'Europe/Helsinki'
+        self.buffer_minutes = 5  # Grace period before task timer starts
+        self.current_task_sent_at = None  # When the current task message was sent
+        self.in_buffer = False  # True = buffer phase, False = task timer phase
+        self.awaiting_honesty_check = False  # End-of-window confirmation pending
+        # Follow-up reminder
+        self.followup_enabled = False
+        self.followup_hour = 21
+        self.followup_minute = 0
+        self.followup_message = "Plan tomorrow"
     
     def add_task(self, name: str, duration: int, optional: bool = False, notes: str = "") -> tuple[bool, str]:
         """Add task with validation. Returns (success, error_message)"""
@@ -126,6 +135,9 @@ class MorningRoutine:
         self.start_time = datetime.datetime.now(pytz.UTC)
         self.paused = False
         self.total_pause_duration = 0
+        self.current_task_sent_at = None
+        self.in_buffer = False
+        self.awaiting_honesty_check = False
         for task in self.tasks:
             task.reset()
         return True
@@ -170,6 +182,13 @@ class MorningRoutine:
             self.tasks[index].mark_complete()
             return True
         return False
+    
+    def get_current_task(self):
+        """Return (index, task) of next incomplete non-skipped task, or (None, None)"""
+        for i, task in enumerate(self.tasks):
+            if not task.completed and not task.skipped:
+                return i, task
+        return None, None
     
     def get_completion_percentage(self) -> float:
         if not self.tasks:
@@ -218,8 +237,20 @@ class MorningRoutine:
         self.paused = False
         self.pause_time = None
         self.total_pause_duration = 0
+        self.current_task_sent_at = None
+        self.in_buffer = False
         
         return True
+    
+    def mark_day_failed(self):
+        """Called when user admits they didn't complete everything"""
+        user_tz = pytz.timezone(self.timezone)
+        today = datetime.datetime.now(user_tz).date().isoformat()
+        if today in self.history:
+            self.history[today]['completion'] = 0
+            self.history[today]['honest_fail'] = True
+        self.current_streak = 0
+        self.awaiting_honesty_check = False
     
     def check_missed_routine(self):
         user_tz = pytz.timezone(self.timezone)
@@ -319,7 +350,15 @@ class MorningRoutine:
             'window_start_minute': self.window_start_minute,  # NEW
             'window_end': self.window_end,
             'window_end_minute': self.window_end_minute,      # NEW
-            'timezone': self.timezone
+            'timezone': self.timezone,
+            'buffer_minutes': self.buffer_minutes,
+            'current_task_sent_at': self.current_task_sent_at.isoformat() if self.current_task_sent_at else None,
+            'in_buffer': self.in_buffer,
+            'awaiting_honesty_check': self.awaiting_honesty_check,
+            'followup_enabled': self.followup_enabled,
+            'followup_hour': self.followup_hour,
+            'followup_minute': self.followup_minute,
+            'followup_message': self.followup_message
         }
 
     @classmethod
@@ -343,4 +382,13 @@ class MorningRoutine:
         routine.window_end = data.get('window_end', 11)
         routine.window_end_minute = data.get('window_end_minute', 0)      # NEW
         routine.timezone = data.get('timezone', 'Europe/Helsinki')
+        routine.buffer_minutes = data.get('buffer_minutes', 5)
+        if data.get('current_task_sent_at'):
+            routine.current_task_sent_at = datetime.datetime.fromisoformat(data['current_task_sent_at'])
+        routine.in_buffer = data.get('in_buffer', False)
+        routine.awaiting_honesty_check = data.get('awaiting_honesty_check', False)
+        routine.followup_enabled = data.get('followup_enabled', False)
+        routine.followup_hour = data.get('followup_hour', 21)
+        routine.followup_minute = data.get('followup_minute', 0)
+        routine.followup_message = data.get('followup_message', 'Plan tomorrow')
         return routine

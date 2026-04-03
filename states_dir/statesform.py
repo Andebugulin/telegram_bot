@@ -24,3 +24,5 @@ class StepsForm(StatesGroup):
     SETTINGS_EDIT_TASK = State()  # For editing individual tasks
     SETTINGS_EDIT_WINDOW = State()
     SETTINGS_EDIT_TIMEZONE = State()
+    SETTINGS_EDIT_BUFFER = State()
+    SETTINGS_EDIT_FOLLOWUP = State()

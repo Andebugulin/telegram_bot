@@ -355,7 +355,6 @@ async def send_next_task(chat_id: int, state: FSMContext):
         
         replies = user_replies.get(chat_id, DEFAULT_REPLIES)
         buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
-        buttons.append([KeyboardButton(text="Skip")])
         buttons.append([KeyboardButton(text="Menu")])
         
         markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
@@ -377,7 +376,6 @@ async def handle_task_response(message: types.Message, state: FSMContext):
     start_minutes = routine.window_start * 60 + routine.window_start_minute
     end_minutes = routine.window_end * 60 + routine.window_end_minute
     
-    # Block if outside window
     if current_minutes < start_minutes or current_minutes >= end_minutes:
         await bot.send_message(chat_id, "*Window closed*")
         await show_main_menu(chat_id, state)
@@ -387,18 +385,7 @@ async def handle_task_response(message: types.Message, state: FSMContext):
         await show_main_menu(chat_id, state)
         return
     
-    if text == "Skip":
-        # Mark current task as skipped
-        for i, task in enumerate(routine.tasks):
-            if not task.completed and not task.skipped:
-                task.skipped = True
-                save_routines()
-                break
-        
-        await send_next_task(chat_id, state)
-        return
-    
-    # Any other response = task completed
+    # ANY reply (including Skip) = task completed
     for i, task in enumerate(routine.tasks):
         if not task.completed and not task.skipped:
             routine.complete_task(i)
@@ -679,17 +666,21 @@ async def show_settings(message: types.Message, state: FSMContext):
     chat_id = message.from_user.id
     await state.set_state(StepsForm.SETTINGS)
     
-    text = make_header("SETTINGS") + """
-Configure your routine
-Customize experience
+    routine = routines_dict[chat_id]
+    followup_status = f"{routine.followup_hour:02d}:{routine.followup_minute:02d}" if routine.followup_enabled else "off"
+    text = make_header("SETTINGS") + f"""
+`Buffer: {routine.buffer_minutes}m` · `Window: {routine.window_start:02d}:{routine.window_start_minute:02d}-{routine.window_end:02d}:{routine.window_end_minute:02d}`
+`Timezone: {routine.timezone}`
+`Reminder: {followup_status}`
 """
     
     markup = ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Edit Routine")],
-            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
-            [KeyboardButton(text="Timezone")],
+            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Buffer")],
+            [KeyboardButton(text="Time Window"), KeyboardButton(text="Timezone")],
+            [KeyboardButton(text="Reminder")],
             [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
             [KeyboardButton(text="Menu")]
         ]
@@ -944,13 +935,9 @@ async def handle_task_response(message: types.Message, state: FSMContext):
         await show_main_menu(chat_id, state)
         return
     
-    if text == "Skip":
-        await send_next_task(chat_id, state)
-        return
-    
-    # Any other response = complete task
+    # ANY reply = task completed
     for i, task in enumerate(routine.tasks):
-        if not task.completed:
+        if not task.completed and not task.skipped:
             routine.complete_task(i)
             save_routines()
             break
@@ -998,12 +985,16 @@ async def send_next_task(chat_id: int, state: FSMContext):
         
         replies = user_replies.get(chat_id, DEFAULT_REPLIES)
         buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
-        buttons.append([KeyboardButton(text="Skip")])
         buttons.append([KeyboardButton(text="Menu")])
         
         markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
         
         await bot.send_message(chat_id, text, reply_markup=markup, disable_notification=True)
+        
+        # Track when this task was sent for auto-advance (buffer phase)
+        routine.current_task_sent_at = datetime.datetime.now(pytz.UTC)
+        routine.in_buffer = True
+        save_routines()
     else:
         await finish_routine_confirmed(chat_id, state)
 
@@ -1114,17 +1105,21 @@ async def show_settings(message: types.Message, state: FSMContext):
     chat_id = message.from_user.id
     await state.set_state(StepsForm.SETTINGS)
     
-    text = make_header("SETTINGS") + """
-Configure your routine
-Customize experience
+    routine = routines_dict[chat_id]
+    followup_status = f"{routine.followup_hour:02d}:{routine.followup_minute:02d}" if routine.followup_enabled else "off"
+    text = make_header("SETTINGS") + f"""
+`Buffer: {routine.buffer_minutes}m` · `Window: {routine.window_start:02d}:{routine.window_start_minute:02d}-{routine.window_end:02d}:{routine.window_end_minute:02d}`
+`Timezone: {routine.timezone}`
+`Reminder: {followup_status}`
 """
     
     markup = ReplyKeyboardMarkup(
         resize_keyboard=True,
         keyboard=[
             [KeyboardButton(text="Edit Routine")],
-            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Time Window")],
-            [KeyboardButton(text="Timezone")],
+            [KeyboardButton(text="Quick Replies"), KeyboardButton(text="Buffer")],
+            [KeyboardButton(text="Time Window"), KeyboardButton(text="Timezone")],
+            [KeyboardButton(text="Reminder")],
             [KeyboardButton(text="Reset"), KeyboardButton(text="Delete All")],
             [KeyboardButton(text="Menu")]
         ],
@@ -1237,6 +1232,156 @@ async def handle_timezone_change(message: types.Message, state: FSMContext):
             await bot.send_message(chat_id, "`Invalid timezone\\. Check spelling\\.`")
     else:
         await bot.send_message(chat_id, "`Format: timezone Europe/Helsinki`")
+
+@dp.message(StepsForm.SETTINGS, F.text == "Buffer")
+async def customize_buffer(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_BUFFER)
+    
+    text = make_header("BUFFER") + f"""
+*Current:* `{routine.buffer_minutes} min`
+
+{SEPARATOR_LIGHT}
+
+Grace period before task timer starts.
+Reply anytime to mark task done.
+
+*Example with 5m buffer:*
+`Task sent → 5m buffer → timer starts`
+
+*Set buffer (minutes):*
+`buffer 5`
+`buffer 10`
+`buffer 0` (no grace period)
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="buffer 5"), KeyboardButton(text="buffer 10")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_BUFFER)
+async def handle_buffer_change(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip().lower()
+    
+    if text == "back":
+        await show_settings(message, state)
+        return
+    
+    parts = text.split()
+    if len(parts) == 2 and parts[0] == "buffer":
+        try:
+            minutes = int(parts[1])
+            if 0 <= minutes <= 60:
+                routine.buffer_minutes = minutes
+                save_routines()
+                await bot.send_message(chat_id, f"`Buffer set to {minutes} min`")
+                await show_settings(message, state)
+            else:
+                await bot.send_message(chat_id, "`Must be 0-60 minutes`")
+        except ValueError:
+            await bot.send_message(chat_id, "`Invalid number`")
+    else:
+        await bot.send_message(chat_id, "`Format: buffer 5`")
+
+@dp.message(StepsForm.SETTINGS, F.text == "Reminder")
+async def customize_followup(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    
+    await state.set_state(StepsForm.SETTINGS_EDIT_FOLLOWUP)
+    
+    status = f"`{routine.followup_hour:02d}:{routine.followup_minute:02d}`" if routine.followup_enabled else "`off`"
+    msg_preview = routine.followup_message or "Plan tomorrow"
+    
+    text = make_header("REMINDER") + f"""
+*Status:* {status}
+*Message:* `{msg_preview}`
+
+{SEPARATOR_LIGHT}
+
+*Commands:*
+`on 21:00` - enable at time
+`off` - disable
+`msg Plan the next day` - set message
+
+"""
+    
+    markup = ReplyKeyboardMarkup(
+        resize_keyboard=True,
+        keyboard=[
+            [KeyboardButton(text="on 21:00"), KeyboardButton(text="off")],
+            [KeyboardButton(text="Back")]
+        ]
+    )
+    
+    await bot.send_message(chat_id, text, reply_markup=markup)
+
+
+@dp.message(StepsForm.SETTINGS_EDIT_FOLLOWUP)
+async def handle_followup_change(message: types.Message, state: FSMContext):
+    chat_id = message.from_user.id
+    routine = routines_dict[chat_id]
+    text = message.text.strip()
+    
+    if text.lower() == "back":
+        await show_settings(message, state)
+        return
+    
+    if text.lower() == "off":
+        routine.followup_enabled = False
+        save_routines()
+        await bot.send_message(chat_id, "`Reminder disabled`")
+        await show_settings(message, state)
+        return
+    
+    parts = text.lower().split(maxsplit=1)
+    
+    # "on 21:00" or "on 21"
+    if parts[0] == "on" and len(parts) == 2:
+        try:
+            time_str = parts[1]
+            if ':' in time_str:
+                hour, minute = map(int, time_str.split(':'))
+            else:
+                hour = int(time_str)
+                minute = 0
+            
+            if not (0 <= hour < 24 and 0 <= minute < 60):
+                await bot.send_message(chat_id, "`Invalid time`")
+                return
+            
+            routine.followup_enabled = True
+            routine.followup_hour = hour
+            routine.followup_minute = minute
+            save_routines()
+            await bot.send_message(chat_id, f"`Reminder set to {hour:02d}:{minute:02d}`")
+            await show_settings(message, state)
+        except ValueError:
+            await bot.send_message(chat_id, "`Format: on 21:00`")
+        return
+    
+    # "msg Plan the next day"
+    if parts[0] == "msg" and len(parts) == 2:
+        routine.followup_message = parts[1].strip()
+        # Preserve original case from raw text
+        routine.followup_message = text.split(maxsplit=1)[1].strip()
+        save_routines()
+        await bot.send_message(chat_id, f"`Message set`")
+        await show_settings(message, state)
+        return
+    
+    await bot.send_message(chat_id, "`Commands: on 21:00, off, msg Your message`")
 
 @dp.message(StepsForm.SETTINGS_EDIT_ROUTINE)
 async def handle_edit_routine(message: types.Message, state: FSMContext):
@@ -1351,9 +1496,73 @@ async def settings_to_menu(message: types.Message, state: FSMContext):
 
 async def on_startup(chat_id:int, task_dictionary:dict) -> None:   
     await bot.send_message(chat_id, "Bot has been started!", disable_notification=True)
-
-    # Schedule the message to be sent daily at 12:00
     asyncio.create_task(scheduled_messages(task_dictionary))
+
+
+async def auto_send_task_message(chat_id: int):
+    """Send current task message without FSM - used by scheduler for auto-advance"""
+    routine = routines_dict[chat_id]
+    
+    idx, next_task = routine.get_current_task()
+    
+    if next_task:
+        task_num = idx + 1
+        total_tasks = len(routine.tasks)
+        completed_tasks = sum(1 for t in routine.tasks if t.completed)
+        skipped_tasks = sum(1 for t in routine.tasks if t.skipped)
+        remaining = total_tasks - completed_tasks - skipped_tasks
+        completion = ((completed_tasks + skipped_tasks) / total_tasks) * 100 if total_tasks > 0 else 0
+        
+        opt_label = " `opt`" if next_task.optional else ""
+        notes_text = f"\n_{next_task.notes}_\n" if next_task.notes else "\n"
+        progress_bar = make_progress_bar(completion, 20)
+        
+        text = make_header(f"TASK {task_num}") + f"""
+*{next_task.name}*
+`{next_task.duration}m`{opt_label}
+{notes_text}
+{progress_bar}
+`{completion:.0f}%` · `{remaining} left`
+"""
+        
+        replies = user_replies.get(chat_id, DEFAULT_REPLIES)
+        buttons = [[KeyboardButton(text=reply)] for reply in replies[:3]]
+        buttons.append([KeyboardButton(text="Menu")])
+        
+        markup = ReplyKeyboardMarkup(resize_keyboard=True, keyboard=buttons)
+        await bot.send_message(chat_id, text, reply_markup=markup, disable_notification=True)
+        
+        # Start buffer phase
+        routine.current_task_sent_at = datetime.datetime.now(pytz.UTC)
+        routine.in_buffer = True
+        save_routines()
+        return True
+    else:
+        # All tasks done - finish routine
+        completion = routine.get_completion_percentage()
+        routine.finish_routine()
+        save_routines()
+        
+        if completion >= 100:
+            streak_bar = make_streak_bar(routine.current_streak, 10)
+            message = make_header("✓ COMPLETE") + f"""
+{make_progress_bar(completion, 20)}
+`{completion:.0f}%`
+
+{streak_bar}
+*{routine.current_streak} day streak*
+
+_{get_encouragement_message(routine.current_streak)}_
+"""
+        else:
+            message = make_header("FINISHED") + f"""
+`{completion:.0f}% complete`
+
+Streak reset
+Tomorrow is a fresh start
+"""
+        await bot.send_message(chat_id, message, disable_notification=True)
+        return False
 
 # Add this handler BEFORE handle_menu_fallback
 # This catches ANY message when setup is complete and routine can start
@@ -1361,12 +1570,11 @@ async def on_startup(chat_id:int, task_dictionary:dict) -> None:
                            routines_dict[message.from_user.id].is_setup_complete and
                            message.text not in ["Stats", "Settings", "Menu", "Back", "Cancel"])
 async def catch_all_start_routine(message: types.Message, state: FSMContext):
-    """Catch responses to 'Ready to start?' notification from any state"""
+    """Any reply = task done. Also handles honesty check at end of window."""
     chat_id = message.from_user.id
     routine = routines_dict[chat_id]
     text = message.text.strip()
     
-    # Get current state
     current_state = await state.get_state()
     
     # Skip if we're in specific flows that need their own handlers
@@ -1378,8 +1586,23 @@ async def catch_all_start_routine(message: types.Message, state: FSMContext):
         StepsForm.SETTINGS_EDIT_TASK,
         StepsForm.SETTINGS_EDIT_WINDOW,
         StepsForm.SETTINGS_EDIT_TIMEZONE,
-        StepsForm.SETTINGS_CUSTOMIZE_REPLIES
+        StepsForm.SETTINGS_CUSTOMIZE_REPLIES,
+        StepsForm.SETTINGS_EDIT_BUFFER,
+        StepsForm.SETTINGS_EDIT_FOLLOWUP
     ]:
+        return
+    
+    # HONESTY CHECK: If awaiting confirmation, any reply = admit failure
+    if routine.awaiting_honesty_check:
+        routine.mark_day_failed()
+        save_routines()
+        await bot.send_message(
+            chat_id,
+            make_header("NOTED") + "\nStreak reset\nTomorrow is a fresh start",
+            disable_notification=True
+        )
+        routine.awaiting_honesty_check = False
+        save_routines()
         return
     
     # Check if we're in the time window
@@ -1389,17 +1612,16 @@ async def catch_all_start_routine(message: types.Message, state: FSMContext):
     start_minutes = routine.window_start * 60 + routine.window_start_minute
     end_minutes = routine.window_end * 60 + routine.window_end_minute
     
-    # If outside window, ignore
     if current_minutes < start_minutes or current_minutes >= end_minutes:
         return
     
-    # If text is "Skip", ignore
-    if text == "Skip":
-        return
-    
-    # If routine already started, continue it
+    # If routine already started, COMPLETE current task then advance
     if routine.routine_started:
-        print(f"[CATCH-ALL CONTINUE] Continuing from: '{text}'")
+        print(f"[CATCH-ALL] Task done from: '{text}'")
+        idx, current_task = routine.get_current_task()
+        if idx is not None:
+            routine.complete_task(idx)
+            save_routines()
         await state.set_state(StepsForm.ROUTINE_ACTIVE)
         await send_next_task(chat_id, state)
     # If routine can start, start it
@@ -1409,11 +1631,6 @@ async def catch_all_start_routine(message: types.Message, state: FSMContext):
             await state.set_state(StepsForm.ROUTINE_ACTIVE)
             save_routines()
             await send_next_task(chat_id, state)
-        else:
-            await bot.send_message(
-                chat_id,
-                f"`Window: {routine.window_start:02d}:{routine.window_start_minute:02d} - {routine.window_end:02d}:{routine.window_end_minute:02d}`\n`Now: {now.strftime('%H:%M')}`"
-            )
 
 
 # Keep the existing handle_menu_fallback but simplify it
@@ -1602,36 +1819,98 @@ async def scheduled_messages(task_dictionary=None):
                     if chat_id not in last_notified:
                         last_notified[chat_id] = {}
                     
-                    # START NOTIFICATION
+                    # CLEANUP: If routine_started from a previous day, reset it
+                    if routine.routine_started and routine.start_time:
+                        started_date = routine.start_time.astimezone(user_tz).date().isoformat()
+                        if started_date != today:
+                            print(f"    → Stale routine from {started_date}, resetting")
+                            routine.check_missed_routine()
+                            save_routines()
+                    
+                    # AUTO-START: At window start, auto-start routine and send first task
                     if (start_minutes <= current_minutes < end_minutes and 
                         not routine.routine_started and 
                         today not in routine.history and
                         last_notified[chat_id].get('start') != today):
                         
-                        print(f"    → Sending start notification")
-                        await bot.send_message(
-                            chat_id,
-                            make_header("Good morning") + "Ready to start?",
-                            disable_notification=True
-                        )
+                        print(f"    → Auto-starting routine and sending first task")
+                        if routine.start_routine():
+                            save_routines()
+                            await auto_send_task_message(chat_id)
+                            # No buffer for first task - timer starts immediately
+                            routine.in_buffer = False
+                            routine.current_task_sent_at = datetime.datetime.now(pytz.UTC)
+                            save_routines()
+                        else:
+                            print(f"    → Auto-start FAILED: can_start={routine.can_start_routine()}, started={routine.routine_started}, history={today in routine.history}")
                         last_notified[chat_id]['start'] = today
                     
-                    # END NOTIFICATION
+                    # AUTO-ADVANCE: Two-phase check
+                    # Phase 1 (in_buffer): wait buffer_minutes, then start task timer
+                    # Phase 2 (not in_buffer): wait task.duration, then auto-complete
+                    if (routine.routine_started and 
+                        routine.current_task_sent_at and
+                        start_minutes <= current_minutes < end_minutes):
+                        
+                        idx, current_task = routine.get_current_task()
+                        if current_task:
+                            elapsed = (datetime.datetime.now(pytz.UTC) - routine.current_task_sent_at).total_seconds() / 60
+                            
+                            if routine.in_buffer:
+                                # Phase 1: buffer grace period
+                                if elapsed >= routine.buffer_minutes:
+                                    print(f"    → Buffer expired for: {current_task.name}, starting {current_task.duration}m timer")
+                                    routine.in_buffer = False
+                                    routine.current_task_sent_at = datetime.datetime.now(pytz.UTC)
+                                    save_routines()
+                            else:
+                                # Phase 2: task timer running
+                                if elapsed >= current_task.duration:
+                                    print(f"    → Auto-advancing: {current_task.name} ({elapsed:.0f}m >= {current_task.duration}m)")
+                                    routine.complete_task(idx)
+                                    save_routines()
+                                    await auto_send_task_message(chat_id)
+                    
+                    # END OF WINDOW: Trust user, complete all tasks, ask honesty check
                     if current_minutes >= end_minutes and routine.routine_started:
-                        print(f"    → Window closed, finishing routine")
-                        
-                        # Get completion BEFORE finishing
-                        completion_before = routine.get_completion_percentage()
-                        
-                        routine.finish_routine()
+                        end_key = f'end_{today}'
+                        if last_notified[chat_id].get('end') != today:
+                            print(f"    → Window closed, completing all tasks (trust mode)")
+                            for task in routine.tasks:
+                                if not task.completed and not task.skipped:
+                                    task.mark_complete()
+                            routine.finish_routine()
+                            routine.awaiting_honesty_check = True
+                            save_routines()
+                            
+                            await bot.send_message(
+                                chat_id,
+                                make_header("WINDOW CLOSED") + f"\nDid you do everything?\n\n`Ignore` = yes, all done\n`Reply` = no, mark incomplete",
+                                disable_notification=True
+                            )
+                            last_notified[chat_id]['end'] = today
+                    
+                    # HONESTY CHECK TIMEOUT: Clear after 1 hour (silence = trust)
+                    if (routine.awaiting_honesty_check and 
+                        current_minutes >= end_minutes + 60):
+                        routine.awaiting_honesty_check = False
                         save_routines()
-                        
-                        await bot.send_message(
-                            chat_id,
-                            f"*Window closed*\n\n`{completion_before:.0f}% complete`\n{'Streak maintained' if completion_before >= 100 else 'Streak reset'}",
-                            disable_notification=True
-                        )
-                        last_notified[chat_id]['end'] = today
+                        print(f"    → Honesty check expired, trusting user")
+                    
+                    # FOLLOW-UP REMINDER: Configurable daily reminder
+                    if routine.followup_enabled:
+                        followup_minutes = routine.followup_hour * 60 + routine.followup_minute
+                        if current_minutes == followup_minutes:
+                            followup_key = f'followup_{today}'
+                            if last_notified[chat_id].get('followup') != today:
+                                msg = routine.followup_message or "Plan tomorrow"
+                                await bot.send_message(
+                                    chat_id,
+                                    make_header("REMINDER") + f"\n{msg}",
+                                    disable_notification=True
+                                )
+                                last_notified[chat_id]['followup'] = today
+                                print(f"    → Sent follow-up reminder: {msg}")
                     
                 except Exception as e:
                     print(f"    ✗ ERROR: {e}")
