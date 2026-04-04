@@ -316,24 +316,68 @@ class MorningRoutine:
             max_name_length = 0
         
         # Calculate estimated time slots
-        cursor = self.window_start * 60 + self.window_start_minute
+        # When routine is active: completed tasks show actual times,
+        # remaining tasks project from NOW (so ETA adjusts as you go faster)
+        # When routine is not active: static schedule from window start
         
-        for i, task in enumerate(self.tasks, 1):
-            status = "✓" if task.completed else "○"
-            opt = " `opt`" if task.optional else ""
-            padding = max_name_length - len(task.name)
-            spaces = "\u2009" * padding
+        if self.routine_started:
+            user_tz = pytz.timezone(self.timezone)
+            now = datetime.datetime.now(user_tz)
+            now_minutes = now.hour * 60 + now.minute
             
-            # Time range
-            start_h, start_m = divmod(cursor, 60)
-            end_cursor = cursor + task.duration
-            end_h, end_m = divmod(end_cursor, 60)
-            time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+            # Track actual time cursor for completed tasks
+            prev_end_minutes = self.window_start * 60 + self.window_start_minute
+            found_current = False
             
-            lines.append(f"{status} `{task.name}{spaces}  {task.duration}m  {time_range}`{opt}\n")
+            for i, task in enumerate(self.tasks, 1):
+                status = "✓" if task.completed else "○"
+                opt = " `opt`" if task.optional else ""
+                padding = max_name_length - len(task.name)
+                spaces = "\u2009" * padding
+                
+                if task.completed and task.completed_at:
+                    # Completed: actual start = prev task end (or window start), actual end = completed_at
+                    actual_end = task.completed_at.astimezone(user_tz)
+                    end_min = actual_end.hour * 60 + actual_end.minute
+                    start_h, start_m = divmod(prev_end_minutes, 60)
+                    end_h, end_m = divmod(end_min, 60)
+                    time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+                    prev_end_minutes = end_min
+                elif not found_current:
+                    # Current task: starts from NOW
+                    found_current = True
+                    cursor = now_minutes
+                    end_cursor = cursor + task.duration
+                    start_h, start_m = divmod(cursor, 60)
+                    end_h, end_m = divmod(end_cursor, 60)
+                    time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+                    cursor = end_cursor + self.buffer_minutes
+                else:
+                    # Future task: project from cursor
+                    end_cursor = cursor + task.duration
+                    start_h, start_m = divmod(cursor, 60)
+                    end_h, end_m = divmod(end_cursor, 60)
+                    time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+                    cursor = end_cursor + self.buffer_minutes
+                
+                lines.append(f"{status} `{task.name}{spaces}  {task.duration}m  {time_range}`{opt}\n")
+        else:
+            # Static schedule from window start
+            cursor = self.window_start * 60 + self.window_start_minute
             
-            # Next task starts after this task + buffer (no buffer before first task)
-            cursor = end_cursor + self.buffer_minutes
+            for i, task in enumerate(self.tasks, 1):
+                status = "✓" if task.completed else "○"
+                opt = " `opt`" if task.optional else ""
+                padding = max_name_length - len(task.name)
+                spaces = "\u2009" * padding
+                
+                start_h, start_m = divmod(cursor, 60)
+                end_cursor = cursor + task.duration
+                end_h, end_m = divmod(end_cursor, 60)
+                time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
+                
+                lines.append(f"{status} `{task.name}{spaces}  {task.duration}m  {time_range}`{opt}\n")
+                cursor = end_cursor + self.buffer_minutes
         
         if self.routine_started:
             completion = self.get_completion_percentage()
