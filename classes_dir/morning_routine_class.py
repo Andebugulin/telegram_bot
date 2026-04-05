@@ -322,8 +322,6 @@ class MorningRoutine:
         
         if self.routine_started:
             user_tz = pytz.timezone(self.timezone)
-            now = datetime.datetime.now(user_tz)
-            now_minutes = now.hour * 60 + now.minute
             
             # Track actual time cursor for completed tasks
             prev_end_minutes = self.window_start * 60 + self.window_start_minute
@@ -336,7 +334,7 @@ class MorningRoutine:
                 spaces = "\u2009" * padding
                 
                 if task.completed and task.completed_at:
-                    # Completed: actual start = prev task end (or window start), actual end = completed_at
+                    # Completed: actual end from timestamp
                     actual_end = task.completed_at.astimezone(user_tz)
                     end_min = actual_end.hour * 60 + actual_end.minute
                     start_h, start_m = divmod(prev_end_minutes, 60)
@@ -344,9 +342,9 @@ class MorningRoutine:
                     time_range = f"{start_h:d}:{start_m:02d}-{end_h:d}:{end_m:02d}"
                     prev_end_minutes = end_min
                 elif not found_current:
-                    # Current task: starts from NOW
+                    # Current task: started when prev task ended, stable end time
                     found_current = True
-                    cursor = now_minutes
+                    cursor = prev_end_minutes
                     end_cursor = cursor + task.duration
                     start_h, start_m = divmod(cursor, 60)
                     end_h, end_m = divmod(end_cursor, 60)
