@@ -1899,29 +1899,21 @@ async def scheduled_messages(task_dictionary=None):
                             print(f"    → Auto-start FAILED: can_start={routine.can_start_routine()}, started={routine.routine_started}, history={today in routine.history}")
                         last_notified[chat_id]['start'] = today
                     
-                    # AUTO-ADVANCE: Two-phase check
-                    # Phase 1 (not in_buffer): task timer → after duration, mark complete
-                    # Phase 2 (in_buffer): buffer wait → after buffer, send next task
+                    # AUTO-ADVANCE: wait duration + buffer, then complete and send next
                     if (routine.routine_started and 
                         routine.current_task_sent_at and
                         start_minutes <= current_minutes < end_minutes):
                         
-                        elapsed = (datetime.datetime.now(pytz.UTC) - routine.current_task_sent_at).total_seconds() / 60
-                        
-                        if routine.in_buffer:
-                            # Phase 2: buffer wait after task completed
-                            if elapsed >= routine.buffer_minutes:
-                                print(f"    → Buffer done, sending next task")
-                                await auto_send_task_message(chat_id)
-                        else:
-                            # Phase 1: task timer running
-                            idx, current_task = routine.get_current_task()
-                            if current_task and elapsed >= current_task.duration:
-                                print(f"    → Auto-completing: {current_task.name} ({elapsed:.0f}m >= {current_task.duration}m)")
+                        idx, current_task = routine.get_current_task()
+                        if current_task:
+                            elapsed = (datetime.datetime.now(pytz.UTC) - routine.current_task_sent_at).total_seconds() / 60
+                            total_wait = current_task.duration + routine.buffer_minutes
+                            
+                            if elapsed >= total_wait:
+                                print(f"    → Auto-advancing: {current_task.name} ({elapsed:.0f}m >= {total_wait}m)")
                                 routine.complete_task(idx)
-                                routine.in_buffer = True
-                                routine.current_task_sent_at = datetime.datetime.now(pytz.UTC)
                                 save_routines()
+                                await auto_send_task_message(chat_id)
                     
                     # END OF WINDOW: Trust user, complete all tasks, ask honesty check
                     if current_minutes >= end_minutes and routine.routine_started:
